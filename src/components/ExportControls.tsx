@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { LinkItem, ExistingLink } from '@/types';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import { format } from 'date-fns';
 
 interface ExportControlsProps {
   linksToExport: LinkItem[];
@@ -13,6 +15,10 @@ interface ExportControlsProps {
 }
 
 export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestions }: ExportControlsProps) {
+  const getCurrentDateFormatted = () => {
+    return format(new Date(), 'yyyy-MM-dd');
+  };
+
   const createBlob = (data: string, type: string) => new Blob([data], { type });
 
   const downloadFile = (blob: Blob, filename: string) => {
@@ -27,24 +33,27 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
   };
 
   const handleExportTXT = () => {
+    const dateStr = getCurrentDateFormatted();
     const data = linksToExport
       .map(link => `Title: ${link.title}\nURL: ${link.url}\nDescription: ${link.description}\nCategory: ${link.category}\nSource: ${link.source}\n---`)
       .join('\n\n');
     const blob = createBlob(data, 'text/plain;charset=utf-8');
-    downloadFile(blob, 'linksage_export.txt');
+    downloadFile(blob, `linksage_export_${dateStr}.txt`);
   };
 
   const handleExportCSV = () => {
+    const dateStr = getCurrentDateFormatted();
     const header = 'ID,Title,URL,Description,Category,Source\n';
     const rows = linksToExport
       .map(link => `"${link.id}","${link.title.replace(/"/g, '""')}","${link.url}","${link.description.replace(/"/g, '""')}","${link.category}","${link.source}"`)
       .join('\n');
     const data = header + rows;
     const blob = createBlob(data, 'text/csv;charset=utf-8');
-    downloadFile(blob, 'linksage_export.csv');
+    downloadFile(blob, `linksage_export_${dateStr}.csv`);
   };
 
   const handleExportPNG = async () => {
+    const dateStr = getCurrentDateFormatted();
     const elementToCapture = document.getElementById('link-list-container');
     if (elementToCapture) {
       try {
@@ -55,7 +64,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = dataUrl;
-        link.download = 'linksage_export.png';
+        link.download = `linksage_export_${dateStr}.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -70,6 +79,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
 
   const handleExportCombinedTXT = () => {
     if (!uploadedLinks || !latestAISuggestions) return;
+    const dateStr = getCurrentDateFormatted();
 
     let data = "Uploaded Links:\n---\n";
     data += uploadedLinks
@@ -82,11 +92,12 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
       .join('\n\n');
 
     const blob = createBlob(data, 'text/plain;charset=utf-8');
-    downloadFile(blob, 'linksage_combined_export.txt');
+    downloadFile(blob, `linksage_combined_export_${dateStr}.txt`);
   };
 
   const handleExportCombinedCSV = () => {
     if (!uploadedLinks || !latestAISuggestions) return;
+    const dateStr = getCurrentDateFormatted();
 
     const header = 'Title,URL,Description,Category,Source,Origin\n';
     let rows = '';
@@ -105,7 +116,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
 
     const data = header + rows;
     const blob = createBlob(data, 'text/csv;charset=utf-8');
-    downloadFile(blob, 'linksage_combined_export.csv');
+    downloadFile(blob, `linksage_combined_export_${dateStr}.csv`);
   };
 
   const canExportCombined = uploadedLinks && uploadedLinks.length > 0 && latestAISuggestions && latestAISuggestions.length > 0;
@@ -141,3 +152,4 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     </DropdownMenu>
   );
 }
+
