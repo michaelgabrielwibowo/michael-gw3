@@ -13,14 +13,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
 const SuggestionFormSchema = z.object({
-  keywords: z.string().min(3, { message: "Keywords must be at least 3 characters long." }),
-  category: z.string().min(1, { message: "Please select a category." }),
+  keywords: z.string().optional(), // Keywords are now optional
+  category: z.string().optional(), // Category is now optional
 });
 
 type SuggestionFormValues = z.infer<typeof SuggestionFormSchema>;
 
 interface AISuggestionFormProps {
-  onSuggest: (keywords: string, category: LinkCategory) => Promise<void>;
+  onSuggest: (keywords: string, category: LinkCategory | '') => Promise<void>; // Category can be empty string
   isLoading: boolean;
 }
 
@@ -36,33 +36,37 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
   const selectedCategory = watch('category');
 
   const onSubmit: SubmitHandler<SuggestionFormValues> = async (data) => {
-    await onSuggest(data.keywords, data.category as LinkCategory);
+    await onSuggest(data.keywords || "", (data.category || "") as LinkCategory | "");
   };
   
-  // Needed to make Select work with react-hook-form
   const handleCategoryChange = (value: string) => {
-    setValue('category', value, { shouldValidate: true });
+    setValue('category', value === "none" ? "" : value, { shouldValidate: true }); // Allow unselecting category
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
-        <Label htmlFor="keywords" className="text-sm font-medium">Keywords</Label>
+        <Label htmlFor="keywords" className="text-sm font-medium">
+          Keywords <span className="text-xs text-muted-foreground">(Optional)</span>
+        </Label>
         <Input
           id="keywords"
           {...register('keywords')}
           placeholder="e.g., react state management, css animations"
           className="mt-1"
         />
-        {errors.keywords && <p className="text-sm text-destructive mt-1">{errors.keywords.message}</p>}
+        {/* Keywords are optional, so no error message for min length needed unless specifically required */}
       </div>
       <div>
-        <Label htmlFor="ai-category" className="text-sm font-medium">Category for Suggestions</Label>
-        <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+        <Label htmlFor="ai-category" className="text-sm font-medium">
+          Category for Suggestions <span className="text-xs text-muted-foreground">(Optional)</span>
+        </Label>
+        <Select value={selectedCategory || "none"} onValueChange={handleCategoryChange}>
           <SelectTrigger id="ai-category" className="w-full mt-1">
-            <SelectValue placeholder="Select category" />
+            <SelectValue placeholder="Select category (or leave random)" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="none">Any / Random Category</SelectItem>
             {ALL_CATEGORIES.map((cat) => (
               <SelectItem key={cat} value={cat}>
                 {cat}
@@ -70,7 +74,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
             ))}
           </SelectContent>
         </Select>
-        {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>}
+        {/* Category is optional, so no error message if not selected */}
       </div>
       <Button type="submit" disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Suggest Links'}

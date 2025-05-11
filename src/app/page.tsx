@@ -25,10 +25,15 @@ export default function HomePage() {
     setAllLinks(INITIAL_LINKS);
   }, []);
   
-  const handleAISuggest = async (keywords: string, category: LinkCategory) => {
+  const handleAISuggest = async (keywords: string, category: LinkCategory | '') => {
     setIsAISuggesting(true);
     try {
-      const result: SuggestLinksOutput = await suggestLinks({ keywords, category });
+      // Use the actual category string, or undefined if it's empty, as per the flow's expectation for optional fields
+      const result: SuggestLinksOutput = await suggestLinks({ 
+        keywords: keywords || undefined, // Pass undefined if keywords is empty
+        category: category || undefined // Pass undefined if category is empty
+      });
+
       if (result.suggestedLinks && result.suggestedLinks.length > 0) {
         const newLinks: LinkItem[] = result.suggestedLinks.map((suggestedLink, index) => ({
           id: `ai-${Date.now()}-${index}`,
@@ -48,7 +53,7 @@ export default function HomePage() {
       } else {
         toast({
           title: "No Suggestions Found",
-          description: "AI could not find relevant links for your query.",
+          description: "AI could not find relevant open-source/free links for your query.",
           variant: "default",
         });
       }
@@ -118,7 +123,7 @@ export default function HomePage() {
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>AI Link Suggestions</CardTitle>
-              <CardDescription>Get new link ideas based on your keywords.</CardDescription>
+              <CardDescription>Get new open-source/free link ideas.</CardDescription>
             </CardHeader>
             <CardContent>
               <AISuggestionForm 
