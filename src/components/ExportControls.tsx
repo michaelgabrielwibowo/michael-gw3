@@ -1,16 +1,18 @@
 'use client';
 
-import type { LinkItem } from '@/types';
+import type { LinkItem, ExistingLink } from '@/types';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ExportControlsProps {
   linksToExport: LinkItem[];
+  uploadedLinks?: ExistingLink[];
+  latestAISuggestions?: LinkItem[];
 }
 
-export function ExportControls({ linksToExport }: ExportControlsProps) {
+export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestions }: ExportControlsProps) {
   const createBlob = (data: string, type: string) => new Blob([data], { type });
 
   const downloadFile = (blob: Blob, filename: string) => {
@@ -66,6 +68,48 @@ export function ExportControls({ linksToExport }: ExportControlsProps) {
     }
   };
 
+  const handleExportCombinedTXT = () => {
+    if (!uploadedLinks || !latestAISuggestions) return;
+
+    let data = "Uploaded Links:\n---\n";
+    data += uploadedLinks
+      .map(link => `Title: ${link.title || 'N/A'}\nURL: ${link.url}\n---`)
+      .join('\n\n');
+    
+    data += "\n\nNewly Suggested AI Links:\n---\n";
+    data += latestAISuggestions
+      .map(link => `Title: ${link.title}\nURL: ${link.url}\nDescription: ${link.description}\nCategory: ${link.category}\nSource: ${link.source}\n---`)
+      .join('\n\n');
+
+    const blob = createBlob(data, 'text/plain;charset=utf-8');
+    downloadFile(blob, 'linksage_combined_export.txt');
+  };
+
+  const handleExportCombinedCSV = () => {
+    if (!uploadedLinks || !latestAISuggestions) return;
+
+    const header = 'Title,URL,Description,Category,Source,Origin\n';
+    let rows = '';
+
+    rows += uploadedLinks
+      .map(link => `"${(link.title || '').replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","","","","Uploaded"`)
+      .join('\n');
+    
+    if (uploadedLinks.length > 0 && latestAISuggestions.length > 0) {
+      rows += '\n'; // Add a newline if both lists have content
+    }
+
+    rows += latestAISuggestions
+      .map(link => `"${link.title.replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","${link.description.replace(/"/g, '""')}","${link.category}","${link.source}","AI Generated"`)
+      .join('\n');
+
+    const data = header + rows;
+    const blob = createBlob(data, 'text/csv;charset=utf-8');
+    downloadFile(blob, 'linksage_combined_export.csv');
+  };
+
+  const canExportCombined = uploadedLinks && uploadedLinks.length > 0 && latestAISuggestions && latestAISuggestions.length > 0;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -74,9 +118,25 @@ export function ExportControls({ linksToExport }: ExportControlsProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
+        <DropdownMenuLabel>Current View</DropdownMenuLabel>
         <DropdownMenuItem onClick={handleExportTXT}>Export as TXT</DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportPNG}>Export as PNG</DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Combined with Uploaded</DropdownMenuLabel>
+        <DropdownMenuItem
+          onClick={handleExportCombinedTXT}
+          disabled={!canExportCombined}
+        >
+          Export Combined (TXT)
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={handleExportCombinedCSV}
+          disabled={!canExportCombined}
+        >
+          Export Combined (CSV)
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

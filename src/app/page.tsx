@@ -20,6 +20,10 @@ export default function HomePage() {
   const [isAISuggesting, setIsAISuggesting] = useState<boolean>(false);
   const { toast } = useToast();
 
+  const [linksFromLastUpload, setLinksFromLastUpload] = useState<ExistingLink[]>([]);
+  const [latestAiSuggestions, setLatestAiSuggestions] = useState<LinkItem[]>([]);
+
+
   useEffect(() => {
     // Ensure initial links are set on client, even if empty
     setAllLinks(INITIAL_LINKS);
@@ -29,15 +33,18 @@ export default function HomePage() {
     keywords: string, 
     category: LinkCategory | '', 
     linkCount: number,
-    existingLinks: ExistingLink[]
+    existingLinksFromForm: ExistingLink[]
   ) => {
     setIsAISuggesting(true);
+    setLinksFromLastUpload(existingLinksFromForm); // Store for combined export
+    setLatestAiSuggestions([]); // Clear previous batch
+
     try {
       const result: SuggestLinksOutput = await suggestLinks({ 
         keywords: keywords || undefined, 
         category: category || undefined,
         count: linkCount,
-        existingLinks: existingLinks.length > 0 ? existingLinks : undefined,
+        existingLinks: existingLinksFromForm.length > 0 ? existingLinksFromForm : undefined,
       });
 
       if (result.suggestedLinks && result.suggestedLinks.length > 0) {
@@ -50,6 +57,7 @@ export default function HomePage() {
           icon: CATEGORIES_INFO['AI Generated']?.icon || Globe,
           source: 'ai',
         }));
+        setLatestAiSuggestions(newLinks); // Store current batch for combined export
         setAllLinks(prevLinks => [...prevLinks, ...newLinks]);
         toast({
           title: "AI Suggestions Added",
@@ -134,7 +142,7 @@ export default function HomePage() {
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>AI Link Suggestions</CardTitle>
-              <CardDescription>Get new open-source/free link ideas. Optionally upload existing links to avoid duplicates.</CardDescription>
+              <CardDescription>Get new open-source/free link ideas. Optionally upload existing links to avoid duplicates. You can export new suggestions combined with your uploaded list via the "Export Links" section.</CardDescription>
             </CardHeader>
             <CardContent>
               <AISuggestionForm 
@@ -165,7 +173,11 @@ export default function HomePage() {
               <CardDescription>Download the current list of links.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ExportControls linksToExport={filteredAndSortedLinks} />
+              <ExportControls 
+                linksToExport={filteredAndSortedLinks} 
+                uploadedLinks={linksFromLastUpload}
+                latestAISuggestions={latestAiSuggestions}
+              />
             </CardContent>
           </Card>
         </aside>
