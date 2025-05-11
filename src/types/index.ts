@@ -17,3 +17,8 @@ export interface CategoryInfo {
   icon: LucideIcon;
   color: string; // Tailwind color class e.g. text-blue-500
 }
+
+export interface ExistingLink {
+  title?: string; // Title is optional as URL is the primary identifier
+  url: string;
+}

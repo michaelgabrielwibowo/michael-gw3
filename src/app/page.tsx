@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import type { LinkItem, LinkCategory } from '@/types';
-import { INITIAL_LINKS, CATEGORIES_INFO, ALL_CATEGORIES } from '@/data/staticLinks';
+import type { LinkItem, LinkCategory, ExistingLink } from '@/types';
+import { INITIAL_LINKS, CATEGORIES_INFO } from '@/data/staticLinks';
 import { suggestLinks, SuggestLinksOutput } from '@/ai/flows/suggest-links';
 import { AppLayout } from '@/components/AppLayout';
 import { LinkList } from '@/components/LinkList';
@@ -11,36 +11,42 @@ import { AISuggestionForm } from '@/components/AISuggestionForm';
 import { ExportControls } from '@/components/ExportControls';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from "@/hooks/use-toast";
-import { Globe } from 'lucide-react'; // Default icon
+import { Globe } from 'lucide-react'; 
 
 export default function HomePage() {
   const [allLinks, setAllLinks] = useState<LinkItem[]>(INITIAL_LINKS);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<string>('title-asc'); // e.g., 'title-asc', 'title-desc', 'category-asc'
+  const [sortBy, setSortBy] = useState<string>('title-asc');
   const [isAISuggesting, setIsAISuggesting] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Hydration safety for initial state
   useEffect(() => {
+    // Ensure initial links are set on client, even if empty
     setAllLinks(INITIAL_LINKS);
   }, []);
   
-  const handleAISuggest = async (keywords: string, category: LinkCategory | '') => {
+  const handleAISuggest = async (
+    keywords: string, 
+    category: LinkCategory | '', 
+    linkCount: number,
+    existingLinks: ExistingLink[]
+  ) => {
     setIsAISuggesting(true);
     try {
-      // Use the actual category string, or undefined if it's empty, as per the flow's expectation for optional fields
       const result: SuggestLinksOutput = await suggestLinks({ 
-        keywords: keywords || undefined, // Pass undefined if keywords is empty
-        category: category || undefined // Pass undefined if category is empty
+        keywords: keywords || undefined, 
+        category: category || undefined,
+        count: linkCount,
+        existingLinks: existingLinks.length > 0 ? existingLinks : undefined,
       });
 
       if (result.suggestedLinks && result.suggestedLinks.length > 0) {
         const newLinks: LinkItem[] = result.suggestedLinks.map((suggestedLink, index) => ({
-          id: `ai-${Date.now()}-${index}`,
+          id: `ai-${Date.now()}-${index}`, // Ensure unique ID
           title: suggestedLink.title,
           description: suggestedLink.description,
           url: suggestedLink.url,
-          category: 'AI Generated', 
+          category: 'AI Generated', // All AI suggestions go to this category
           icon: CATEGORIES_INFO['AI Generated']?.icon || Globe,
           source: 'ai',
         }));
@@ -52,8 +58,8 @@ export default function HomePage() {
         });
       } else {
         toast({
-          title: "No Suggestions Found",
-          description: "AI could not find relevant open-source/free links for your query.",
+          title: "No New Suggestions Found",
+          description: "AI could not find new relevant open-source/free links based on your criteria.",
           variant: "default",
         });
       }
@@ -84,7 +90,11 @@ export default function HomePage() {
         links.sort((a, b) => b.title.localeCompare(a.title));
         break;
       case 'category-asc':
-        links.sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+        links.sort((a, b) => {
+          const catComp = a.category.localeCompare(b.category);
+          if (catComp !== 0) return catComp;
+          return a.title.localeCompare(b.title);
+        });
         break;
       case 'source-asc': // Curated first
         links.sort((a,b) => {
@@ -101,6 +111,8 @@ export default function HomePage() {
         });
         break;
       default:
+        // Default sort by title if sortBy is unrecognized
+        links.sort((a, b) => a.title.localeCompare(b.title));
         break;
     }
     return links;
@@ -118,12 +130,11 @@ export default function HomePage() {
   return (
     <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Sidebar Controls - takes 4 columns on large screens */}
         <aside className="lg:col-span-4 xl:col-span-3 space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>AI Link Suggestions</CardTitle>
-              <CardDescription>Get new open-source/free link ideas.</CardDescription>
+              <CardDescription>Get new open-source/free link ideas. Optionally upload existing links to avoid duplicates.</CardDescription>
             </CardHeader>
             <CardContent>
               <AISuggestionForm 
@@ -159,13 +170,12 @@ export default function HomePage() {
           </Card>
         </aside>
 
-        {/* Main Content Area - takes 8 columns on large screens */}
         <section className="lg:col-span-8 xl:col-span-9">
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="text-2xl">Link Collection</CardTitle>
               <CardDescription>
-                Showing {filteredAndSortedLinks.length} of {allLinks.length} links. 
+                Showing {filteredAndSortedLinks.length} of {allLinks.length} total links. 
                 {selectedCategory !== 'All' && ` Filtered by "${selectedCategory}".`}
               </CardDescription>
             </CardHeader>
