@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
@@ -23,8 +24,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}>
+    // The 'dark' class will be dynamically added/removed here by the ThemeToggle component
+    // The initial class can be set to avoid FOUC if known server-side, or handled client-side.
+    // For this setup, ThemeToggle handles it client-side.
+    <html lang="en" className="h-full"> 
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-full bg-background text-foreground transition-colors duration-300`}>
         {children}
       </body>
     </html>

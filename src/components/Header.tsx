@@ -1,11 +1,16 @@
+
 import { Library } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
   return (
     <header className="bg-primary text-primary-foreground shadow-md">
-      <div className="container mx-auto px-4 py-4 flex items-center">
-        <Library className="h-8 w-8 mr-3" />
-        <h1 className="text-2xl font-bold tracking-tight">LinkSage</h1>
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <Library className="h-8 w-8 mr-3" />
+          <h1 className="text-2xl font-bold tracking-tight">LinkSage</h1>
+        </div>
+        <ThemeToggle />
       </div>
     </header>
   );
