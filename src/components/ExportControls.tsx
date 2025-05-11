@@ -32,6 +32,30 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     URL.revokeObjectURL(url);
   };
 
+  const exportElementAsPNG = async (elementId: string, filename: string) => {
+    const elementToCapture = document.getElementById(elementId);
+    if (elementToCapture) {
+      try {
+        const canvas = await html2canvas(elementToCapture, {
+          backgroundColor: getComputedStyle(document.body).getPropertyValue('--background') || '#FFFFFF', // Default to white if CSS var not found
+          scale: 1.5, // Increase scale for better quality
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (error) {
+        console.error(`Error exporting ${elementId} to PNG as ${filename}:`, error);
+        alert(`Failed to export as PNG (${filename}). Check console for details.`);
+      }
+    } else {
+      alert(`Could not find element "${elementId}" to export. Ensure it is visible.`);
+    }
+  };
+
   const handleExportTXT = () => {
     const dateTimeStr = getCurrentDateTimeFormatted();
     const data = linksToExport
@@ -59,29 +83,9 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     downloadFile(blob, `linksage_export_${dateTimeStr}.json`);
   };
 
-  const handleExportPNG = async () => {
+  const handleExportPNG = () => {
     const dateTimeStr = getCurrentDateTimeFormatted();
-    const elementToCapture = document.getElementById('link-list-container');
-    if (elementToCapture) {
-      try {
-        const canvas = await html2canvas(elementToCapture, {
-          backgroundColor: getComputedStyle(document.body).getPropertyValue('--background') || '#F5F5F5', // Use theme background
-          scale: 1.5, // Increase scale for better quality
-        });
-        const dataUrl = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = `linksage_export_${dateTimeStr}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (error) {
-        console.error('Error exporting to PNG:', error);
-        alert('Failed to export as PNG. Check console for details.');
-      }
-    } else {
-      alert('Could not find element to export. Ensure links are visible.');
-    }
+    exportElementAsPNG('link-list-container', `linksage_export_${dateTimeStr}.png`);
   };
 
   const handleExportCombinedTXT = () => {
@@ -138,6 +142,15 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     downloadFile(blob, `linksage_combined_export_${dateTimeStr}.json`);
   };
 
+  const handleExportCombinedPNG = () => {
+    // This action is guarded by canExportCombined in the DropdownMenuItem.
+    // It exports the current view of 'link-list-container' with a "combined" filename.
+    // The 'link-list-container' will show 'latestAISuggestions' if they've been added to 'allLinks',
+    // but it won't explicitly show 'uploadedLinks' separately unless the UI is designed to do so.
+    const dateTimeStr = getCurrentDateTimeFormatted();
+    exportElementAsPNG('link-list-container', `linksage_combined_export_${dateTimeStr}.png`);
+  };
+
   const canExportCombined = uploadedLinks && uploadedLinks.length > 0 && latestAISuggestions && latestAISuggestions.length > 0;
 
   return (
@@ -154,28 +167,37 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportPNG}>Export as PNG</DropdownMenuItem>
         
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Combined with Uploaded</DropdownMenuLabel>
-        <DropdownMenuItem
-          onClick={handleExportCombinedTXT}
-          disabled={!canExportCombined}
-        >
-          Export Combined (TXT)
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={handleExportCombinedCSV}
-          disabled={!canExportCombined}
-        >
-          Export Combined (CSV)
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={handleExportCombinedJSON}
-          disabled={!canExportCombined}
-        >
-          Export Combined (JSON)
-        </DropdownMenuItem>
+        { (uploadedLinks && uploadedLinks.length > 0) || (latestAISuggestions && latestAISuggestions.length > 0) ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Combined with Uploaded</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={handleExportCombinedTXT}
+              disabled={!canExportCombined}
+            >
+              Export Combined (TXT)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleExportCombinedCSV}
+              disabled={!canExportCombined}
+            >
+              Export Combined (CSV)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleExportCombinedJSON}
+              disabled={!canExportCombined}
+            >
+              Export Combined (JSON)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleExportCombinedPNG}
+              disabled={!canExportCombined}
+            >
+              Export Combined (PNG)
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
-
