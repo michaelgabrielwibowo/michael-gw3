@@ -51,6 +51,13 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     const blob = createBlob(data, 'text/csv;charset=utf-8');
     downloadFile(blob, `linksage_export_${dateTimeStr}.csv`);
   };
+  
+  const handleExportJSON = () => {
+    const dateTimeStr = getCurrentDateTimeFormatted();
+    const data = JSON.stringify(linksToExport, null, 2);
+    const blob = createBlob(data, 'application/json;charset=utf-8');
+    downloadFile(blob, `linksage_export_${dateTimeStr}.json`);
+  };
 
   const handleExportPNG = async () => {
     const dateTimeStr = getCurrentDateTimeFormatted();
@@ -118,6 +125,18 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     const blob = createBlob(data, 'text/csv;charset=utf-8');
     downloadFile(blob, `linksage_combined_export_${dateTimeStr}.csv`);
   };
+  
+  const handleExportCombinedJSON = () => {
+    if (!uploadedLinks || !latestAISuggestions) return;
+    const dateTimeStr = getCurrentDateTimeFormatted();
+    const combinedData = {
+      uploadedLinks: uploadedLinks,
+      newlySuggestedAILinks: latestAISuggestions,
+    };
+    const data = JSON.stringify(combinedData, null, 2);
+    const blob = createBlob(data, 'application/json;charset=utf-8');
+    downloadFile(blob, `linksage_combined_export_${dateTimeStr}.json`);
+  };
 
   const canExportCombined = uploadedLinks && uploadedLinks.length > 0 && latestAISuggestions && latestAISuggestions.length > 0;
 
@@ -132,6 +151,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         <DropdownMenuLabel>Current View</DropdownMenuLabel>
         <DropdownMenuItem onClick={handleExportTXT}>Export as TXT</DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
         <DropdownMenuItem onClick={handleExportPNG}>Export as PNG</DropdownMenuItem>
         
         <DropdownMenuSeparator />
@@ -147,6 +167,12 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
           disabled={!canExportCombined}
         >
           Export Combined (CSV)
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={handleExportCombinedJSON}
+          disabled={!canExportCombined}
+        >
+          Export Combined (JSON)
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

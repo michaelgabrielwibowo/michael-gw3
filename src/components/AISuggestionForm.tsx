@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback } from 'react';
@@ -73,8 +74,10 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
           links = parseTxtContent(content);
         } else if (file.name.endsWith('.csv')) {
           links = parseCsvContent(content);
+        } else if (file.name.endsWith('.json')) {
+          links = parseJsonContent(content);
         } else {
-          toast({ title: "Unsupported File Type", description: "Please upload a .txt or .csv file.", variant: "destructive" });
+          toast({ title: "Unsupported File Type", description: "Please upload a .txt, .csv, or .json file.", variant: "destructive" });
           setUploadedFile(null);
           setParsedExistingLinks([]);
           event.target.value = ''; // Clear the input
@@ -123,7 +126,9 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     }
 
     for (let i = 1; i < rows.length; i++) {
-      const values = rows[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      // Basic CSV parsing, may need improvement for complex CSVs (e.g., values with commas)
+      const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+
       const url = values[urlIndex];
       if (url) {
         const title = titleIndex !== -1 ? values[titleIndex] : undefined;
@@ -132,6 +137,29 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     }
     return links.filter(link => link.url);
   };
+
+  const parseJsonContent = (content: string): ExistingLink[] => {
+    try {
+      const parsed = JSON.parse(content);
+      if (!Array.isArray(parsed)) {
+        toast({ title: "JSON Parsing Error", description: "JSON file must contain an array of links.", variant: "destructive" });
+        return [];
+      }
+      const links: ExistingLink[] = parsed.map((item: any) => ({
+        title: typeof item.title === 'string' ? item.title : undefined,
+        url: typeof item.url === 'string' ? item.url : '',
+      })).filter(link => link.url); // Ensure URL exists and is a string
+
+      if (links.length !== parsed.length) {
+         toast({ title: "JSON Data Incomplete", description: "Some items in the JSON were missing a valid URL.", variant: "default" });
+      }
+      return links;
+    } catch (e) {
+      toast({ title: "JSON Parsing Error", description: "Invalid JSON format.", variant: "destructive" });
+      return [];
+    }
+  };
+
 
   const onSubmit: SubmitHandler<SuggestionFormValues> = async (data) => {
     await onSuggest(data.keywords || "", (data.category || "") as LinkCategory | "", data.linkCount, parsedExistingLinks);
@@ -189,12 +217,12 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       </div>
       <div>
         <Label htmlFor="uploadLinks" className="text-sm font-medium">
-          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional .txt/.csv, max 10MB)</span>
+          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional .txt/.csv/.json, max {MAX_FILE_SIZE / (1024*1024)}MB)</span>
         </Label>
         <Input
           id="uploadLinks"
           type="file"
-          accept=".txt,.csv"
+          accept=".txt,.csv,.json"
           onChange={handleFileChange}
           className="mt-1"
         />
@@ -206,3 +234,4 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     </form>
   );
 }
+
