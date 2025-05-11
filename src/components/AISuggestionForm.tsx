@@ -32,6 +32,8 @@ interface AISuggestionFormProps {
   isLoading: boolean;
 }
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps) {
   const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm<SuggestionFormValues>({
     resolver: zodResolver(SuggestionFormSchema),
@@ -51,6 +53,18 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File Too Large",
+          description: `Please upload a file smaller than ${MAX_FILE_SIZE / (1024*1024)}MB.`,
+          variant: "destructive",
+        });
+        event.target.value = ''; // Clear the input
+        setUploadedFile(null);
+        setParsedExistingLinks([]);
+        return;
+      }
+
       setUploadedFile(file);
       try {
         const content = await file.text();
@@ -63,6 +77,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
           toast({ title: "Unsupported File Type", description: "Please upload a .txt or .csv file.", variant: "destructive" });
           setUploadedFile(null);
           setParsedExistingLinks([]);
+          event.target.value = ''; // Clear the input
           return;
         }
         setParsedExistingLinks(links);
@@ -72,6 +87,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
         toast({ title: "File Parsing Error", description: "Could not read or parse the file.", variant: "destructive" });
         setUploadedFile(null);
         setParsedExistingLinks([]);
+        event.target.value = ''; // Clear the input
       }
     } else {
       setUploadedFile(null);
@@ -173,7 +189,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       </div>
       <div>
         <Label htmlFor="uploadLinks" className="text-sm font-medium">
-          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional .txt/.csv to avoid duplicates)</span>
+          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional .txt/.csv, max 10MB)</span>
         </Label>
         <Input
           id="uploadLinks"
