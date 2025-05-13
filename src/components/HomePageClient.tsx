@@ -1,3 +1,4 @@
+// src/components/HomePageClient.tsx
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -11,20 +12,20 @@ import { AISuggestionForm } from '@/components/AISuggestionForm';
 import { ExportControls } from '@/components/ExportControls';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from "@/hooks/use-toast";
-import { Globe, Lightbulb } from 'lucide-react'; 
-import { useTranslations, NextIntlClientProvider } from 'next-intl';
+import { Lightbulb } from 'lucide-react'; 
+import { useTranslations } from 'next-intl'; // No need for NextIntlClientProvider here if layout provides it
 
 interface HomePageClientProps {
   locale: Locale;
-  messages: any; // Messages for NextIntlClientProvider
+  // messages prop removed as it should consume context from LocaleLayout
 }
 
-export default function HomePageClient({ locale, messages }: HomePageClientProps) {
-  const t = useTranslations(); // General translations for this component
+export default function HomePageClient({ locale }: HomePageClientProps) {
+  const t = useTranslations(); // General translations for this component, relies on provider from layout
 
-  const [allLinks, setAllLinks] = useState<LinkItem[]>(INITIAL_LINKS.map(link => ({...link, addedTimestamp: 0 }))); // Add initial timestamp
+  const [allLinks, setAllLinks] = useState<LinkItem[]>([]); 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<string>('title-asc');
+  const [sortBy, setSortBy] = useState<string>('date-desc'); // Default to last added
   const [isAISuggesting, setIsAISuggesting] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -32,9 +33,10 @@ export default function HomePageClient({ locale, messages }: HomePageClientProps
   const [latestAiSuggestions, setLatestAiSuggestions] = useState<LinkItem[]>([]);
 
   useEffect(() => {
+    // Initialize with timestamped links
     setAllLinks(INITIAL_LINKS.map((link, index) => ({
       ...link, 
-      addedTimestamp: Date.now() - (INITIAL_LINKS.length - index) // Assign older timestamps to initial links
+      addedTimestamp: Date.now() - (INITIAL_LINKS.length - index) * 1000 // Ensure distinct timestamps
     })));
   }, []);
   
@@ -69,23 +71,34 @@ export default function HomePageClient({ locale, messages }: HomePageClientProps
 
       if (result.suggestedLinks && result.suggestedLinks.length > 0) {
         const currentTimestamp = Date.now();
-        const newLinks: LinkItem[] = result.suggestedLinks.map((suggestedLink, index) => ({
-          id: `ai-${currentTimestamp}-${index}`, 
-          title: suggestedLink.title,
-          description: suggestedLink.description,
-          url: suggestedLink.url,
-          category: 'AI Generated', 
-          icon: CATEGORIES_INFO['AI Generated']?.icon || Lightbulb,
-          source: 'ai',
-          addedTimestamp: currentTimestamp + index, // Ensure unique timestamp for sorting
+        const newLinks: LinkItem[] = result.suggestedLinks
+          .filter(sl => !allLinks.some(al => al.url === sl.url)) // Ensure uniqueness against current allLinks
+          .map((suggestedLink, index) => ({
+            id: `ai-${currentTimestamp}-${index}`, 
+            title: suggestedLink.title,
+            description: suggestedLink.description,
+            url: suggestedLink.url,
+            category: 'AI Generated', 
+            icon: CATEGORIES_INFO['AI Generated']?.icon || Lightbulb,
+            source: 'ai',
+            addedTimestamp: currentTimestamp + index, 
         }));
-        setLatestAiSuggestions(newLinks); 
-        setAllLinks(prevLinks => [...prevLinks, ...newLinks]);
-        toast({
-          title: t('HomePage.aiSuggestionsAddedTitle'),
-          description: t('HomePage.aiSuggestionsAddedDesc', { count: newLinks.length }),
-          variant: "default",
-        });
+
+        if (newLinks.length > 0) {
+            setLatestAiSuggestions(newLinks); 
+            setAllLinks(prevLinks => [...prevLinks, ...newLinks]);
+            toast({
+              title: t('HomePage.aiSuggestionsAddedTitle'),
+              description: t('HomePage.aiSuggestionsAddedDesc', { count: newLinks.length }),
+              variant: "default",
+            });
+        } else {
+             toast({
+              title: t('HomePage.noNewUniqueSuggestionsTitle'),
+              description: t('HomePage.noNewUniqueSuggestionsDesc'),
+              variant: "default",
+            });
+        }
       } else {
         toast({
           title: t('HomePage.noNewSuggestionsTitle'),
@@ -129,11 +142,11 @@ export default function HomePageClient({ locale, messages }: HomePageClientProps
       case 'date-asc': // First Added
         links.sort((a, b) => (a.addedTimestamp || 0) - (b.addedTimestamp || 0));
         break;
-      case 'date-desc': // Last Added
+      case 'date-desc': // Last Added (Default)
         links.sort((a, b) => (b.addedTimestamp || 0) - (a.addedTimestamp || 0));
         break;
-      default:
-        links.sort((a, b) => a.title.localeCompare(b.title));
+      default: // Default to last added
+        links.sort((a, b) => (b.addedTimestamp || 0) - (a.addedTimestamp || 0));
         break;
     }
     return links;
@@ -149,69 +162,68 @@ export default function HomePageClient({ locale, messages }: HomePageClientProps
 
 
   return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
-      <AppLayout>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <aside className="lg:col-span-4 xl:col-span-3 space-y-6">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>{t('HomePage.aiSuggestionsTitle')}</CardTitle>
-                <CardDescription>{t('HomePage.aiSuggestionsDesc')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AISuggestionForm 
-                  onSuggest={handleAISuggest} 
-                  isLoading={isAISuggesting} 
-                />
-              </CardContent>
-            </Card>
+    // NextIntlClientProvider should be in LocaleLayout, wrapping this component's usage.
+    <AppLayout>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <aside className="lg:col-span-4 xl:col-span-3 space-y-6">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>{t('HomePage.aiSuggestionsTitle')}</CardTitle>
+              <CardDescription>{t('HomePage.aiSuggestionsDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AISuggestionForm 
+                onSuggest={handleAISuggest} 
+                isLoading={isAISuggesting} 
+              />
+            </CardContent>
+          </Card>
 
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>{t('HomePage.filterSortTitle')}</CardTitle>
-                <CardDescription>{t('HomePage.filterSortDesc')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FilterControls
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={handleCategorySelect}
-                  currentSort={sortBy}
-                  onSortChange={handleSortChange}
-                />
-              </CardContent>
-            </Card>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>{t('HomePage.filterSortTitle')}</CardTitle>
+              <CardDescription>{t('HomePage.filterSortDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FilterControls
+                selectedCategory={selectedCategory}
+                onSelectCategory={handleCategorySelect}
+                currentSort={sortBy}
+                onSortChange={handleSortChange}
+              />
+            </CardContent>
+          </Card>
 
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>{t('HomePage.exportDataTitle')}</CardTitle>
-                <CardDescription>{t('HomePage.exportDataDesc')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ExportControls 
-                  linksToExport={filteredAndSortedLinks} 
-                  uploadedLinks={linksFromLastUpload}
-                  latestAISuggestions={latestAiSuggestions}
-                />
-              </CardContent>
-            </Card>
-          </aside>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>{t('HomePage.exportDataTitle')}</CardTitle>
+              <CardDescription>{t('HomePage.exportDataDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ExportControls 
+                linksToExport={filteredAndSortedLinks} 
+                uploadedLinks={linksFromLastUpload}
+                latestAISuggestions={latestAiSuggestions}
+              />
+            </CardContent>
+          </Card>
+        </aside>
 
-          <section className="lg:col-span-8 xl:col-span-9">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-2xl">{t('HomePage.linkCollectionTitle')}</CardTitle>
-                <CardDescription>
-                  {t('HomePage.linkCollectionDesc', { count: filteredAndSortedLinks.length, total: allLinks.length })}
-                  {selectedCategory !== 'All' && ` ${t('HomePage.filteredBy', { category: selectedCategory })}`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LinkList links={filteredAndSortedLinks} />
-              </CardContent>
-            </Card>
-          </section>
-        </div>
-      </AppLayout>
-    </NextIntlClientProvider>
+        <section className="lg:col-span-8 xl:col-span-9">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl">{t('HomePage.linkCollectionTitle')}</CardTitle>
+              <CardDescription>
+                {t('HomePage.linkCollectionDesc', { count: filteredAndSortedLinks.length, total: allLinks.length })}
+                {selectedCategory !== 'All' && ` ${t('HomePage.filteredBy', { category: selectedCategory })}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LinkList links={filteredAndSortedLinks} />
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </AppLayout>
   );
 }
