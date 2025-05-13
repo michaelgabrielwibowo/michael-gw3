@@ -10,7 +10,10 @@ export function Header() {
           <Library className="h-8 w-8 mr-3" />
           <h1 className="text-2xl font-bold tracking-tight">LinkSage</h1>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center space-x-2">
+          <ThemeToggle />
+          {/* LanguageSwitcher removed */}
+        </div>
       </div>
     </header>
   );

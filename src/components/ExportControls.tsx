@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { LinkItem, ExistingLink } from '@/types';
@@ -7,7 +8,6 @@ import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import { useTranslations } from 'next-intl';
 
 interface ExportControlsProps {
   linksToExport: LinkItem[];
@@ -16,8 +16,6 @@ interface ExportControlsProps {
 }
 
 export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestions }: ExportControlsProps) {
-  const t = useTranslations('ExportControls');
-
   const getCurrentDateTimeFormatted = () => {
     return format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
   };
@@ -65,19 +63,19 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     let filenameSuffix = 'export';
 
     if (combined && canExportCombined) {
-      data = t('uploadedLinksHeader') + "\n---\n";
+      data = "Uploaded Links\n---\n";
       data += (uploadedLinks ?? [])
         .map(link => `Title: ${link.title || 'N/A'}\nURL: ${link.url}\n---`)
-        .join('\n\n');
-      data += "\n\n" + t('aiSuggestionsHeader') + "\n---\n";
+        .join('\\n\\n');
+      data += "\n\nAI Suggestions\n---\n";
       data += (latestAISuggestions ?? [])
         .map(link => `Title: ${link.title}\nURL: ${link.url}\nDescription: ${link.description}\nCategory: ${link.category}\nSource: ${link.source}\n---`)
-        .join('\n\n');
+        .join('\\n\\n');
       filenameSuffix = 'combined_export';
     } else {
       data = linksToExport
         .map(link => `Title: ${link.title}\nURL: ${link.url}\nDescription: ${link.description}\nCategory: ${link.category}\nSource: ${link.source}\n---`)
-        .join('\n\n');
+        .join('\\n\\n');
     }
     const blob = createBlob(data, 'text/plain;charset=utf-8');
     downloadFile(blob, `linksage_${filenameSuffix}_${dateTimeStr}.txt`);
@@ -85,25 +83,25 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
 
   const handleExportCSV = (combined = false) => {
     const dateTimeStr = getCurrentDateTimeFormatted();
-    const header = 'Title,URL,Description,Category,Source,Origin\n';
+    const header = 'Title,URL,Description,Category,Source,Origin\\n';
     let rows = '';
     let filenameSuffix = 'export';
 
     if (combined && canExportCombined) {
       rows += (uploadedLinks ?? [])
         .map(link => `"${(link.title || 'N/A').replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","","","","Uploaded"`)
-        .join('\n');
+        .join('\\n');
       if ((uploadedLinks?.length ?? 0) > 0 && (latestAISuggestions?.length ?? 0) > 0) {
-        rows += '\n';
+        rows += '\\n';
       }
       rows += (latestAISuggestions ?? [])
         .map(link => `"${link.title.replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","${link.description.replace(/"/g, '""')}","${link.category}","${link.source}","AI Generated"`)
-        .join('\n');
+        .join('\\n');
       filenameSuffix = 'combined_export';
     } else {
       rows = linksToExport
         .map(link => `"${link.title.replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","${link.description.replace(/"/g, '""')}","${link.category}","${link.source}","${link.source === 'ai' ? 'AI Generated' : 'Curated'}"`)
-        .join('\n');
+        .join('\\n');
     }
     const data = header + rows;
     const blob = createBlob(data, 'text/csv;charset=utf-8');
@@ -173,45 +171,41 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     XLSX.writeFile(wb, `linksage_${filenameSuffix}_${dateTimeStr}.xlsx`);
   };
 
-
   const handleExportPNG = (combined = false) => {
     const dateTimeStr = getCurrentDateTimeFormatted();
     let filenameSuffix = 'export';
     if(combined && canExportCombined) {
       filenameSuffix = 'combined_export';
     }
-    // Note: PNG export captures the current view. If "combined" means specific data not just current view, this needs adjustment.
-    // For now, assumes it captures whatever is in 'link-list-container'.
     exportElementAsPNG('link-list-container', `linksage_${filenameSuffix}_${dateTimeStr}.png`);
   };
 
   const canExportCombined = (uploadedLinks && uploadedLinks.length > 0) || (latestAISuggestions && latestAISuggestions.length > 0);
 
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="w-full">
-          <Download className="mr-2 h-4 w-4" /> {t('exportLinksButton')}
+          <Download className="mr-2 h-4 w-4" /> Export Links
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
-        <DropdownMenuLabel>{t('currentViewLabel')}</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => handleExportTXT()}>{t('exportAsTXT')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExportCSV()}>{t('exportAsCSV')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExportJSON()}>{t('exportAsJSON')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExportXLSX()}>{t('exportAsXLSX')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExportPNG()}>{t('exportAsPNG')}</DropdownMenuItem>
+        <DropdownMenuLabel>Current View</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handleExportTXT()}>Export as TXT</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExportCSV()}>Export as CSV</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExportJSON()}>Export as JSON</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExportXLSX()}>Export as XLSX</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExportPNG()}>Export as PNG</DropdownMenuItem>
         
         { canExportCombined ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>{t('combinedExportLabel')}</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleExportTXT(true)}>{t('exportCombinedTXT')}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportCSV(true)}>{t('exportCombinedCSV')}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportJSON(true)}>{t('exportCombinedJSON')}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportXLSX(true)}>{t('exportCombinedXLSX')}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportPNG(true)}>{t('exportCombinedPNG')}</DropdownMenuItem>
+            <DropdownMenuLabel>Combined Export</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleExportTXT(true)}>Export Combined TXT</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportCSV(true)}>Export Combined CSV</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportJSON(true)}>Export Combined JSON</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportXLSX(true)}>Export Combined XLSX</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportPNG(true)}>Export Combined PNG</DropdownMenuItem>
           </>
         ) : null}
       </DropdownMenuContent>

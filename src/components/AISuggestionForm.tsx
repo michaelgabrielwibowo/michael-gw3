@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -14,8 +15,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
-import { useTranslations } from 'next-intl';
-
 
 const SuggestionFormSchema = z.object({
   keywords: z.string().optional(),
@@ -38,7 +37,6 @@ interface AISuggestionFormProps {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps) {
-  const t = useTranslations();
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<SuggestionFormValues>({
     resolver: zodResolver(SuggestionFormSchema),
     defaultValues: {
@@ -58,8 +56,8 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     const links: ExistingLink[] = [];
     const entries = content.split('---');
     entries.forEach(entry => {
-      const titleMatch = entry.match(/Title:\s*(.*)/i); // Case-insensitive title
-      const urlMatch = entry.match(/URL:\s*(.*)/i); // Case-insensitive URL
+      const titleMatch = entry.match(/Title:\s*(.*)/i);
+      const urlMatch = entry.match(/URL:\s*(.*)/i);
       if (urlMatch?.[1]) {
         links.push({ title: titleMatch?.[1]?.trim() || undefined, url: urlMatch[1].trim() });
       }
@@ -69,7 +67,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
 
   const parseCsvContent = (content: string): ExistingLink[] => {
     const links: ExistingLink[] = [];
-    const rows = content.split('\n').map(row => row.trim()).filter(row => row);
+    const rows = content.split('\\n').map(row => row.trim()).filter(row => row);
     if (rows.length < 1) return links;
 
     const header = rows[0].split(',').map(h => String(h).trim().toLowerCase().replace(/"/g, ''));
@@ -77,7 +75,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     const urlIndex = header.indexOf('url');
 
     if (urlIndex === -1) {
-      toast({ title: t('AISuggestionForm.csvParsingErrorTitle'), description: t('AISuggestionForm.csvParsingErrorURLColumn'), variant: "destructive" });
+      toast({ title: "CSV Parsing Error", description: "CSV file must contain a 'url' column.", variant: "destructive" });
       return [];
     }
 
@@ -96,7 +94,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     try {
       const parsed = JSON.parse(content);
       if (!Array.isArray(parsed)) {
-        toast({ title: t('AISuggestionForm.jsonParsingErrorTitle'), description: t('AISuggestionForm.jsonParsingErrorArray'), variant: "destructive" });
+        toast({ title: "JSON Parsing Error", description: "JSON file must contain an array of link objects.", variant: "destructive" });
         return [];
       }
       const links: ExistingLink[] = parsed.map((item: any) => ({
@@ -105,11 +103,11 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       })).filter(link => link.url);
 
       if (links.length !== parsed.length) {
-         toast({ title: t('AISuggestionForm.jsonDataIncompleteTitle'), description: t('AISuggestionForm.jsonDataIncompleteDesc'), variant: "default" });
+         toast({ title: "Incomplete JSON Data", description: "Some items in the JSON array were missing a 'url' and were ignored.", variant: "default" });
       }
       return links;
     } catch (e) {
-      toast({ title: t('AISuggestionForm.jsonParsingErrorTitle'), description: t('AISuggestionForm.jsonParsingErrorFormat'), variant: "destructive" });
+      toast({ title: "JSON Parsing Error", description: "Could not parse JSON file. Ensure it's a valid JSON array.", variant: "destructive" });
       return [];
     }
   };
@@ -119,7 +117,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       const workbook = XLSX.read(buffer, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       if (!firstSheetName) {
-        toast({ title: t('AISuggestionForm.xlsxParsingErrorTitle'), description: t('AISuggestionForm.xlsxParsingErrorNoSheets'), variant: "destructive" });
+        toast({ title: "XLSX Parsing Error", description: "No sheets found in the XLSX file.", variant: "destructive" });
         return [];
       }
       const worksheet = workbook.Sheets[firstSheetName];
@@ -132,7 +130,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       const titleIndex = headers.indexOf('title');
 
       if (urlIndex === -1) {
-        toast({ title: t('AISuggestionForm.xlsxParsingErrorTitle'), description: t('AISuggestionForm.xlsxParsingErrorURLColumn'), variant: "destructive" });
+        toast({ title: "XLSX Parsing Error", description: "XLSX file must contain a 'url' column in the first sheet.", variant: "destructive" });
         return [];
       }
 
@@ -148,7 +146,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       return links.filter(link => link.url);
     } catch (error) {
       console.error("Error parsing XLSX file:", error);
-      toast({ title: t('AISuggestionForm.xlsxParsingErrorTitle'), description: t('AISuggestionForm.xlsxParsingErrorGeneric'), variant: "destructive" });
+      toast({ title: "XLSX Parsing Error", description: "Could not parse XLSX file.", variant: "destructive" });
       return [];
     }
   };
@@ -158,8 +156,8 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
         toast({
-          title: t('AISuggestionForm.fileTooLargeTitle'),
-          description: t('AISuggestionForm.fileTooLargeDesc', { maxSize: MAX_FILE_SIZE / (1024*1024) }),
+          title: "File Too Large",
+          description: `Please upload a file smaller than ${MAX_FILE_SIZE / (1024*1024)} MB.`,
           variant: "destructive",
         });
         event.target.value = ''; 
@@ -182,17 +180,17 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
           links = parseXlsxContent(arrayBuffer);
         }
          else {
-          toast({ title: t('AISuggestionForm.unsupportedFileTypeTitle'), description: t('AISuggestionForm.unsupportedFileTypeDesc'), variant: "destructive" });
+          toast({ title: "Unsupported File Type", description: "Please upload a .txt, .csv, .json, or .xlsx file.", variant: "destructive" });
           setUploadedFile(null);
           setParsedExistingLinks([]);
           event.target.value = ''; 
           return;
         }
         setParsedExistingLinks(links);
-        toast({ title: t('AISuggestionForm.fileProcessedTitle'), description: t('AISuggestionForm.fileProcessedDesc', { count: links.length, fileName: file.name }), variant: "default" });
+        toast({ title: "File Processed", description: `${links.length} links parsed from ${file.name}.`, variant: "default" });
       } catch (error) {
         console.error("Error parsing file:", error);
-        toast({ title: t('AISuggestionForm.fileParsingErrorGenericTitle'), description: t('AISuggestionForm.fileParsingErrorGenericDesc'), variant: "destructive" });
+        toast({ title: "File Parsing Error", description: "An error occurred while parsing the file.", variant: "destructive" });
         setUploadedFile(null);
         setParsedExistingLinks([]);
         event.target.value = ''; 
@@ -215,28 +213,28 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div>
         <Label htmlFor="keywords" className="text-sm font-medium">
-          {t('AISuggestionForm.keywordsLabel')} <span className="text-xs text-muted-foreground">({t('AISuggestionForm.optionalLabel')})</span>
+          Keywords <span className="text-xs text-muted-foreground">(Optional)</span>
         </Label>
         <Input
           id="keywords"
           {...register('keywords')}
-          placeholder={t('AISuggestionForm.keywordsPlaceholder')}
+          placeholder="e.g., react, machine learning, free cooking course"
           className="mt-1"
         />
       </div>
       <div>
         <Label htmlFor="ai-category" className="text-sm font-medium">
-          {t('AISuggestionForm.categoryLabel')} <span className="text-xs text-muted-foreground">({t('AISuggestionForm.optionalLabel')})</span>
+          Category <span className="text-xs text-muted-foreground">(Optional)</span>
         </Label>
         <Select value={selectedCategory || "none"} onValueChange={handleCategoryChange}>
           <SelectTrigger id="ai-category" className="w-full mt-1">
-            <SelectValue placeholder={t('AISuggestionForm.categoryPlaceholder')} />
+            <SelectValue placeholder="Suggest from any category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">{t('AISuggestionForm.anyCategory')}</SelectItem>
+            <SelectItem value="none">Any Category</SelectItem>
             {ALL_CATEGORIES.map((cat) => (
               <SelectItem key={cat} value={cat}>
-                 {CATEGORIES_INFO[cat]?.name ? t(`categories.${cat.toLowerCase().replace(/\s+/g, '')}`) : cat}
+                 {CATEGORIES_INFO[cat]?.name || cat}
               </SelectItem>
             ))}
           </SelectContent>
@@ -244,7 +242,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       </div>
       <div>
         <Label htmlFor="linkCount" className="text-sm font-medium">
-          {t('AISuggestionForm.linkCountLabel', { count: linkCount })}
+          Number of Links to Suggest: {linkCount}
         </Label>
         <Slider
           id="linkCount"
@@ -254,12 +252,12 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
           defaultValue={[5]}
           onValueChange={(value) => setValue('linkCount', value[0])}
           className="mt-2"
-          aria-label={t('AISuggestionForm.linkCountAriaLabel')}
+          aria-label="Number of links to suggest slider"
         />
       </div>
       <div>
         <Label htmlFor="uploadLinks" className="text-sm font-medium">
-          {t('AISuggestionForm.uploadLabel')} <span className="text-xs text-muted-foreground">({t('AISuggestionForm.uploadHint', { maxSize: MAX_FILE_SIZE / (1024*1024) })})</span>
+          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional, max {MAX_FILE_SIZE / (1024*1024)}MB, .txt, .csv, .json, .xlsx)</span>
         </Label>
         <Input
           id="uploadLinks"
@@ -268,10 +266,10 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
           onChange={handleFileChange}
           className="mt-1"
         />
-        {uploadedFile && <p className="text-xs text-muted-foreground mt-1">{t('AISuggestionForm.fileInfo', { fileName: uploadedFile.name, count: parsedExistingLinks.length })}</p>}
+        {uploadedFile && <p className="text-xs text-muted-foreground mt-1">{uploadedFile.name} ({parsedExistingLinks.length} links parsed)</p>}
       </div>
       <Button type="submit" disabled={isLoading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : t('AISuggestionForm.submitButton')}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Suggest Links"}
       </Button>
     </form>
   );

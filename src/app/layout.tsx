@@ -1,17 +1,14 @@
 
-import type {Metadata} from 'next';
-import {Geist, Geist_Mono} from 'next/font/google';
+import type { Metadata } from 'next';
+import { Geist } from 'next/font/google';
 import './globals.css';
+import { AppLayout } from '@/components/AppLayout'; // Import AppLayout here
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
 });
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+// Removed geistMono if not explicitly used or defined elsewhere, ensure it is if needed.
 
 export const metadata: Metadata = {
   title: 'LinkSage - Curated & AI-Suggested Links',
@@ -24,11 +21,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // The 'dark' class will be dynamically added/removed here by the ThemeToggle component
-    // The initial class can be set to avoid FOUC if known server-side, or handled client-side.
-    // For this setup, ThemeToggle handles it client-side.
-    <html lang="en" className="h-full"> 
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-full bg-background text-foreground transition-colors duration-300`}>
+    <html lang="en" className="h-full">
+      <body className={`${geistSans.variable} antialiased h-full bg-background text-foreground transition-colors duration-300`}>
+        {/* AppLayout now wraps children directly here, or children are passed to a main page component which uses AppLayout */}
         {children}
       </body>
     </html>

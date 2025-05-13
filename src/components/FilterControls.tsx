@@ -1,10 +1,10 @@
+
 'use client';
 
 import type { LinkCategory } from '@/types';
 import { ALL_CATEGORIES, CATEGORIES_INFO } from '@/data/staticLinks';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useTranslations } from 'next-intl';
 
 interface FilterControlsProps {
   selectedCategory: string;
@@ -14,45 +14,43 @@ interface FilterControlsProps {
 }
 
 export function FilterControls({ selectedCategory, onSelectCategory, currentSort, onSortChange }: FilterControlsProps) {
-  const t = useTranslations('FilterControls');
-
   const sortOptions = [
-    { value: 'title-asc', labelKey: 'sortOptions.titleAsc' },
-    { value: 'title-desc', labelKey: 'sortOptions.titleDesc' },
-    { value: 'category-asc', labelKey: 'sortOptions.categoryAsc' },
-    { value: 'date-asc', labelKey: 'sortOptions.firstAdded' },
-    { value: 'date-desc', labelKey: 'sortOptions.lastAdded' },
+    { value: 'title-asc', label: 'Title (A-Z)' },
+    { value: 'title-desc', label: 'Title (Z-A)' },
+    { value: 'category-asc', label: 'Category' },
+    { value: 'date-desc', label: 'Last Added' },
+    { value: 'date-asc', label: 'First Added' },
   ];
 
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="category-filter" className="text-sm font-medium">{t('filterByCategory')}</Label>
+        <Label htmlFor="category-filter" className="text-sm font-medium">Filter by Category</Label>
         <Select value={selectedCategory} onValueChange={onSelectCategory}>
           <SelectTrigger id="category-filter" className="w-full mt-1">
-            <SelectValue placeholder={t('selectCategoryPlaceholder')} />
+            <SelectValue placeholder="Select a category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">{t('allCategories')}</SelectItem>
+            <SelectItem value="All">All Categories</SelectItem>
             {ALL_CATEGORIES.map((cat) => (
               <SelectItem key={cat} value={cat}>
-                {CATEGORIES_INFO[cat]?.name ? t(`categories.${cat.toLowerCase().replace(/\s+/g, '')}`) : cat}
+                {CATEGORIES_INFO[cat]?.name || cat}
               </SelectItem>
             ))}
-             <SelectItem value="AI Generated">{t('categories.aiGenerated')}</SelectItem>
+             <SelectItem value="AI Generated">AI Generated</SelectItem>
           </SelectContent>
         </Select>
       </div>
       <div>
-        <Label htmlFor="sort-by" className="text-sm font-medium">{t('sortBy')}</Label>
+        <Label htmlFor="sort-by" className="text-sm font-medium">Sort By</Label>
         <Select value={currentSort} onValueChange={onSortChange}>
           <SelectTrigger id="sort-by" className="w-full mt-1">
-            <SelectValue placeholder={t('selectSortOrderPlaceholder')} />
+            <SelectValue placeholder="Select sort order" />
           </SelectTrigger>
           <SelectContent>
             {sortOptions.map(option => (
               <SelectItem key={option.value} value={option.value}>
-                {t(option.labelKey)}
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>

@@ -1,9 +1,12 @@
-// src/app/page.tsx
-import { redirect } from 'next/navigation';
-import { defaultLocale } from '@/i18n-config'; // Ensure this path is correct
 
-// This page will redirect to the default locale.
-// All content should be served under /[locale]/...
+import HomePageClient from '@/components/HomePageClient';
+import { AppLayout } from '@/components/AppLayout';
+
+// This is now the main page for the application root.
 export default function RootPage() {
-  redirect(`/${defaultLocale}`);
+  return (
+    <AppLayout>
+      <HomePageClient />
+    </AppLayout>
+  );
 }

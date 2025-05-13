@@ -1,11 +1,11 @@
-// src/components/HomePageClient.tsx
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import type { LinkItem, LinkCategory, ExistingLink, Locale } from '@/types';
+import type { LinkItem, LinkCategory, ExistingLink } from '@/types';
 import { INITIAL_LINKS, CATEGORIES_INFO } from '@/data/staticLinks';
 import { suggestLinks, SuggestLinksOutput } from '@/ai/flows/suggest-links';
-import { AppLayout } from '@/components/AppLayout';
+// AppLayout is now used in src/app/page.tsx, wrapping this component
 import { LinkList } from '@/components/LinkList';
 import { FilterControls } from '@/components/FilterControls';
 import { AISuggestionForm } from '@/components/AISuggestionForm';
@@ -13,19 +13,14 @@ import { ExportControls } from '@/components/ExportControls';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from "@/hooks/use-toast";
 import { Lightbulb } from 'lucide-react'; 
-import { useTranslations } from 'next-intl'; // No need for NextIntlClientProvider here if layout provides it
 
-interface HomePageClientProps {
-  locale: Locale;
-  // messages prop removed as it should consume context from LocaleLayout
-}
+// Props no longer include locale or messages
+interface HomePageClientProps {}
 
-export default function HomePageClient({ locale }: HomePageClientProps) {
-  const t = useTranslations(); // General translations for this component, relies on provider from layout
-
+export default function HomePageClient({}: HomePageClientProps) {
   const [allLinks, setAllLinks] = useState<LinkItem[]>([]); 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<string>('date-desc'); // Default to last added
+  const [sortBy, setSortBy] = useState<string>('date-desc');
   const [isAISuggesting, setIsAISuggesting] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -33,10 +28,9 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
   const [latestAiSuggestions, setLatestAiSuggestions] = useState<LinkItem[]>([]);
 
   useEffect(() => {
-    // Initialize with timestamped links
     setAllLinks(INITIAL_LINKS.map((link, index) => ({
       ...link, 
-      addedTimestamp: Date.now() - (INITIAL_LINKS.length - index) * 1000 // Ensure distinct timestamps
+      addedTimestamp: Date.now() - (INITIAL_LINKS.length - index) * 1000 
     })));
   }, []);
   
@@ -72,7 +66,7 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
       if (result.suggestedLinks && result.suggestedLinks.length > 0) {
         const currentTimestamp = Date.now();
         const newLinks: LinkItem[] = result.suggestedLinks
-          .filter(sl => !allLinks.some(al => al.url === sl.url)) // Ensure uniqueness against current allLinks
+          .filter(sl => !allLinks.some(al => al.url === sl.url))
           .map((suggestedLink, index) => ({
             id: `ai-${currentTimestamp}-${index}`, 
             title: suggestedLink.title,
@@ -88,29 +82,29 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
             setLatestAiSuggestions(newLinks); 
             setAllLinks(prevLinks => [...prevLinks, ...newLinks]);
             toast({
-              title: t('HomePage.aiSuggestionsAddedTitle'),
-              description: t('HomePage.aiSuggestionsAddedDesc', { count: newLinks.length }),
+              title: "AI Suggestions Added",
+              description: `${newLinks.length} new AI-suggested links have been added.`,
               variant: "default",
             });
         } else {
              toast({
-              title: t('HomePage.noNewUniqueSuggestionsTitle'),
-              description: t('HomePage.noNewUniqueSuggestionsDesc'),
+              title: "No New Unique Suggestions",
+              description: "The AI did not find any new unique links based on your criteria and existing links.",
               variant: "default",
             });
         }
       } else {
         toast({
-          title: t('HomePage.noNewSuggestionsTitle'),
-          description: t('HomePage.noNewSuggestionsDesc'),
+          title: "No New Suggestions",
+          description: "The AI could not find any new links based on your criteria.",
           variant: "default",
         });
       }
     } catch (error) {
       console.error("Error fetching AI suggestions:", error);
       toast({
-        title: t('HomePage.aiSuggestionFailedTitle'),
-        description: t('HomePage.aiSuggestionFailedDesc'),
+        title: "AI Suggestion Failed",
+        description: "There was an error fetching suggestions from the AI. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -139,13 +133,11 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
           return a.title.localeCompare(b.title);
         });
         break;
-      case 'date-asc': // First Added
+      case 'date-asc': 
         links.sort((a, b) => (a.addedTimestamp || 0) - (b.addedTimestamp || 0));
         break;
-      case 'date-desc': // Last Added (Default)
-        links.sort((a, b) => (b.addedTimestamp || 0) - (a.addedTimestamp || 0));
-        break;
-      default: // Default to last added
+      case 'date-desc': 
+      default:
         links.sort((a, b) => (b.addedTimestamp || 0) - (a.addedTimestamp || 0));
         break;
     }
@@ -162,14 +154,12 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
 
 
   return (
-    // NextIntlClientProvider should be in LocaleLayout, wrapping this component's usage.
-    <AppLayout>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <aside className="lg:col-span-4 xl:col-span-3 space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>{t('HomePage.aiSuggestionsTitle')}</CardTitle>
-              <CardDescription>{t('HomePage.aiSuggestionsDesc')}</CardDescription>
+              <CardTitle>AI Link Suggestions</CardTitle>
+              <CardDescription>Get new open-source/free link ideas. Optionally upload existing links to avoid duplicates.</CardDescription>
             </CardHeader>
             <CardContent>
               <AISuggestionForm 
@@ -181,8 +171,8 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
 
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>{t('HomePage.filterSortTitle')}</CardTitle>
-              <CardDescription>{t('HomePage.filterSortDesc')}</CardDescription>
+              <CardTitle>Filter & Sort Links</CardTitle>
+              <CardDescription>Organize your link collection.</CardDescription>
             </CardHeader>
             <CardContent>
               <FilterControls
@@ -196,8 +186,8 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
 
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>{t('HomePage.exportDataTitle')}</CardTitle>
-              <CardDescription>{t('HomePage.exportDataDesc')}</CardDescription>
+              <CardTitle>Export Data</CardTitle>
+              <CardDescription>Download your links in various formats.</CardDescription>
             </CardHeader>
             <CardContent>
               <ExportControls 
@@ -212,10 +202,10 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
         <section className="lg:col-span-8 xl:col-span-9">
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl">{t('HomePage.linkCollectionTitle')}</CardTitle>
+              <CardTitle className="text-2xl">Link Collection</CardTitle>
               <CardDescription>
-                {t('HomePage.linkCollectionDesc', { count: filteredAndSortedLinks.length, total: allLinks.length })}
-                {selectedCategory !== 'All' && ` ${t('HomePage.filteredBy', { category: selectedCategory })}`}
+                Displaying {filteredAndSortedLinks.length} of {allLinks.length} total links.
+                {selectedCategory !== 'All' && ` Filtered by: ${selectedCategory}`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -224,6 +214,5 @@ export default function HomePageClient({ locale }: HomePageClientProps) {
           </Card>
         </section>
       </div>
-    </AppLayout>
   );
 }
