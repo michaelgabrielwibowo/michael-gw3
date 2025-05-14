@@ -78,7 +78,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         .join('\\n\\n');
     }
     const blob = createBlob(data, 'text/plain;charset=utf-8');
-    downloadFile(blob, `linksage_${filenameSuffix}_${dateTimeStr}.txt`);
+    downloadFile(blob, `usefuls_${filenameSuffix}_${dateTimeStr}.txt`);
   };
 
   const handleExportCSV = (combined = false) => {
@@ -105,7 +105,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     }
     const data = header + rows;
     const blob = createBlob(data, 'text/csv;charset=utf-8');
-    downloadFile(blob, `linksage_${filenameSuffix}_${dateTimeStr}.csv`);
+    downloadFile(blob, `usefuls_${filenameSuffix}_${dateTimeStr}.csv`);
   };
   
   const handleExportJSON = (combined = false) => {
@@ -124,7 +124,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     }
     const data = JSON.stringify(exportData, null, 2);
     const blob = createBlob(data, 'application/json;charset=utf-8');
-    downloadFile(blob, `linksage_${filenameSuffix}_${dateTimeStr}.json`);
+    downloadFile(blob, `usefuls_${filenameSuffix}_${dateTimeStr}.json`);
   };
 
   const handleExportXLSX = (combined = false) => {
@@ -168,7 +168,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     const ws = XLSX.utils.json_to_sheet(sheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `linksage_${filenameSuffix}_${dateTimeStr}.xlsx`);
+    XLSX.writeFile(wb, `usefuls_${filenameSuffix}_${dateTimeStr}.xlsx`);
   };
 
   const handleExportPNG = (combined = false) => {
@@ -177,7 +177,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     if(combined && canExportCombined) {
       filenameSuffix = 'combined_export';
     }
-    exportElementAsPNG('link-list-container', `linksage_${filenameSuffix}_${dateTimeStr}.png`);
+    exportElementAsPNG('link-list-container', `usefuls_${filenameSuffix}_${dateTimeStr}.png`);
   };
 
   const canExportCombined = (uploadedLinks && uploadedLinks.length > 0) || (latestAISuggestions && latestAISuggestions.length > 0);

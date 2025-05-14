@@ -14,7 +14,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {children}
       </main>
       <footer className="py-4 text-center text-muted-foreground text-sm border-t">
-        © {new Date().getFullYear()} LinkSage. All rights reserved.
+        © {new Date().getFullYear()} Usefuls. All rights reserved.
       </footer>
       <Toaster />
     </div>

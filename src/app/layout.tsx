@@ -11,8 +11,8 @@ const geistSans = Geist({
 // Removed geistMono if not explicitly used or defined elsewhere, ensure it is if needed.
 
 export const metadata: Metadata = {
-  title: 'LinkSage - Curated & AI-Suggested Links',
-  description: 'Discover, manage, and export useful links with AI-powered suggestions.',
+  title: 'Usefuls - Curated & AI-Suggested Links',
+  description: 'Usefuls - Discover, manage, and export useful links with AI-powered suggestions.',
 };
 
 export default function RootLayout({
