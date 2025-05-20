@@ -41,7 +41,7 @@ interface AISuggestionFormProps {
   isLoading: boolean;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+// MAX_FILE_SIZE constant removed
 
 export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps) {
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<SuggestionFormValues>({
@@ -161,18 +161,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: "File Too Large",
-          description: `Please upload a file smaller than ${MAX_FILE_SIZE / (1024*1024)} MB.`,
-          variant: "destructive",
-        });
-        event.target.value = ''; 
-        setUploadedFile(null);
-        setParsedExistingLinks([]);
-        return;
-      }
-
+      // File size check removed
       setUploadedFile(file);
       try {
         let links: ExistingLink[] = [];
@@ -287,8 +276,9 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
       </div>
       <div>
         <Label htmlFor="uploadLinks" className="text-sm font-medium">
-          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional, max {MAX_FILE_SIZE / (1024*1024)}MB, .txt, .csv, .json, .xlsx)</span>
+          Upload Existing Links <span className="text-xs text-muted-foreground">(Optional, .txt, .csv, .json, .xlsx)</span>
         </Label>
+        <p className="text-xs text-destructive mt-0.5">Warning: Uploading very large files may impact browser performance due to RAM usage.</p>
         <Input
           id="uploadLinks"
           type="file"
