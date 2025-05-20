@@ -4,6 +4,5 @@
     "region": "asia-southeast1",
     "sourceFlag": "--source .",
     "allowUnauthenticatedInvocationsFlag": "--allow-unauthenticated"
-  },
-  "gemini_api": {}
+  }
 }

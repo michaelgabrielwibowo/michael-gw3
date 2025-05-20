@@ -36,7 +36,7 @@ export default function HomePageClient({}: HomePageClientProps) {
   
   const handleAISuggest = async (
     keywords: string, 
-    category: LinkCategory | '', 
+    categories: string[], // Changed from LinkCategory | '' to string[]
     linkCount: number,
     existingLinksFromForm: ExistingLink[]
   ) => {
@@ -58,7 +58,7 @@ export default function HomePageClient({}: HomePageClientProps) {
     try {
       const result: SuggestLinksOutput = await suggestLinks({ 
         keywords: keywords || undefined, 
-        category: category || undefined,
+        category: categories.length > 0 ? categories : undefined, // Pass array or undefined
         count: linkCount,
         existingLinks: uniqueExistingLinksForAI.length > 0 ? uniqueExistingLinksForAI : undefined,
       });
@@ -66,7 +66,7 @@ export default function HomePageClient({}: HomePageClientProps) {
       if (result.suggestedLinks && result.suggestedLinks.length > 0) {
         const currentTimestamp = Date.now();
         const newLinks: LinkItem[] = result.suggestedLinks
-          .filter(sl => !allLinks.some(al => al.url === sl.url))
+          .filter(sl => !allLinks.some(al => al.url === sl.url)) // Avoid client-side duplicates too
           .map((suggestedLink, index) => ({
             id: `ai-${currentTimestamp}-${index}`, 
             title: suggestedLink.title,
@@ -80,7 +80,15 @@ export default function HomePageClient({}: HomePageClientProps) {
 
         if (newLinks.length > 0) {
             setLatestAiSuggestions(newLinks); 
-            setAllLinks(prevLinks => [...prevLinks, ...newLinks]);
+            setAllLinks(prevLinks => {
+              const newCombinedLinks = [...prevLinks];
+              newLinks.forEach(newLink => {
+                if (!newCombinedLinks.some(existingLink => existingLink.url === newLink.url)) {
+                  newCombinedLinks.push(newLink);
+                }
+              });
+              return newCombinedLinks;
+            });
             toast({
               title: "AI Suggestions Added",
               description: `${newLinks.length} new AI-suggested links have been added.`,
@@ -205,7 +213,7 @@ export default function HomePageClient({}: HomePageClientProps) {
               <CardTitle className="text-2xl">Link Collection</CardTitle>
               <CardDescription>
                 Displaying {filteredAndSortedLinks.length} of {allLinks.length} total links.
-                {selectedCategory !== 'All' && ` Filtered by: ${selectedCategory}`}
+                {selectedCategory !== 'All' && ` Filtered by: ${CATEGORIES_INFO[selectedCategory as LinkCategory]?.name || selectedCategory}`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -216,3 +224,4 @@ export default function HomePageClient({}: HomePageClientProps) {
       </div>
   );
 }
+

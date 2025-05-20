@@ -3,17 +3,17 @@
 'use server';
 /**
  * @fileOverview This file defines a Genkit flow for suggesting relevant links.
- * It can suggest links based on user-defined keywords, categories, a desired count, and a list of existing links to avoid.
+ * It can suggest links based on user-defined keywords, an array of categories, a desired count, and a list of existing links to avoid.
  * If no specific criteria are provided, it suggests random open-source/free links.
  * All links must be for open-source projects or free online resources.
  *
- * - suggestLinks - A function that takes optional keywords, category, count, and existing links to suggest relevant new links.
+ * - suggestLinks - A function that takes optional keywords, categories, count, and existing links to suggest relevant new links.
  * - SuggestLinksInput - The input type for the suggestLinks function.
  * - SuggestLinksOutput - The output type for the suggestLinks function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod'; // Corrected import
 import { ALL_CATEGORIES } from '@/data/staticLinks';
 
 const ExistingLinkSchema = z.object({
@@ -23,7 +23,7 @@ const ExistingLinkSchema = z.object({
 
 const SuggestLinksInputSchema = z.object({
   keywords: z.string().optional().describe('Optional keywords related to the desired links. If empty, suggest random links.'),
-  category: z.string().optional().describe('Optional category of the links (e.g., learning, project repos, tools, videos). If empty, choose a random category or suggest from any category.'),
+  category: z.array(z.string()).optional().describe('Optional array of categories of the links (e.g., learning, project repos, tools, videos). If empty or not provided, choose a random category or suggest from any category.'),
   count: z.number().min(1).max(20).default(5).describe('The number of new, unique links to suggest. Defaults to 5 if not specified.'),
   existingLinks: z.array(ExistingLinkSchema).optional().describe('An array of existing links (URL is primary key) to avoid suggesting duplicates. The AI should not suggest any link whose URL is in this list.'),
 });
@@ -50,12 +50,13 @@ Ensure all suggested links are genuinely open-source or completely free to acces
 
 {{#if keywords}}
 Base your suggestions on the provided keywords: "{{keywords}}".
-{{else}}
-Suggest some interesting and useful random open-source projects or free online resources.
 {{/if}}
 
-{{#if category}}
-Focus on the category: "{{category}}".
+{{#if category.length}}
+Focus on the following categories:
+{{#each category}}
+- "{{this}}"
+{{/each}}
 {{else}}
 You can pick a suitable category or suggest from any relevant category. Possible categories include: ${ALL_CATEGORIES.join(', ')}.
 {{/if}}
@@ -100,7 +101,7 @@ const suggestLinksFlow = ai.defineFlow(
   async (input) => {
     const processedInput = {
         keywords: input.keywords || undefined,
-        category: input.category || undefined,
+        category: input.category && input.category.length > 0 ? input.category : undefined,
         count: input.count || 5, // Default to 5 if not provided
         existingLinks: input.existingLinks && input.existingLinks.length > 0 ? input.existingLinks : undefined,
     };

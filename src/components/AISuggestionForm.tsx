@@ -1,24 +1,31 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { LinkCategory, ExistingLink } from '@/types';
 import { ALL_CATEGORIES, CATEGORIES_INFO } from '@/data/staticLinks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown } from 'lucide-react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const SuggestionFormSchema = z.object({
   keywords: z.string().optional(),
-  category: z.string().optional(),
+  category: z.array(z.string()).optional().default([]), // Changed to array of strings
   linkCount: z.number().min(1).max(20).default(5),
 });
 
@@ -27,7 +34,7 @@ type SuggestionFormValues = z.infer<typeof SuggestionFormSchema>;
 interface AISuggestionFormProps {
   onSuggest: (
     keywords: string, 
-    category: LinkCategory | '', 
+    categories: string[], // Changed from LinkCategory | ''
     linkCount: number, 
     existingLinks: ExistingLink[]
   ) => Promise<void>;
@@ -41,7 +48,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     resolver: zodResolver(SuggestionFormSchema),
     defaultValues: {
       keywords: "",
-      category: "",
+      category: [],
       linkCount: 5,
     }
   });
@@ -49,7 +56,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [parsedExistingLinks, setParsedExistingLinks] = useState<ExistingLink[]>([]);
 
-  const selectedCategory = watch('category');
+  const selectedCategories = watch('category', []);
   const linkCount = watch('linkCount');
 
   const parseTxtContent = (content: string): ExistingLink[] => {
@@ -202,12 +209,20 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
   };
 
   const onSubmit: SubmitHandler<SuggestionFormValues> = async (data) => {
-    await onSuggest(data.keywords || "", (data.category || "") as LinkCategory | "", data.linkCount, parsedExistingLinks);
+    await onSuggest(data.keywords || "", data.category || [], data.linkCount, parsedExistingLinks);
   };
   
-  const handleCategoryChange = (value: string) => {
-    setValue('category', value === "none" ? "" : value, { shouldValidate: true });
+  const getCategoryButtonLabel = () => {
+    if (!selectedCategories || selectedCategories.length === 0) {
+      return "Suggest from any category";
+    }
+    if (selectedCategories.length === 1) {
+      const catInfo = CATEGORIES_INFO[selectedCategories[0] as LinkCategory];
+      return catInfo?.name || selectedCategories[0];
+    }
+    return `${selectedCategories.length} categories selected`;
   };
+
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -223,22 +238,37 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
         />
       </div>
       <div>
-        <Label htmlFor="ai-category" className="text-sm font-medium">
-          Category <span className="text-xs text-muted-foreground">(Optional)</span>
+        <Label htmlFor="ai-category-dropdown-trigger" className="text-sm font-medium">
+          Categories <span className="text-xs text-muted-foreground">(Optional, select multiple)</span>
         </Label>
-        <Select value={selectedCategory || "none"} onValueChange={handleCategoryChange}>
-          <SelectTrigger id="ai-category" className="w-full mt-1">
-            <SelectValue placeholder="Suggest from any category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Any Category</SelectItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" id="ai-category-dropdown-trigger" className="w-full mt-1 justify-between">
+              <span>{getCategoryButtonLabel()}</span>
+              <ChevronDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
+            <DropdownMenuLabel>Select Categories</DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {ALL_CATEGORIES.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                 {CATEGORIES_INFO[cat]?.name || cat}
-              </SelectItem>
+              <DropdownMenuCheckboxItem
+                key={cat}
+                checked={selectedCategories.includes(cat)}
+                onCheckedChange={(checked) => {
+                  const currentSelection = selectedCategories || [];
+                  if (checked) {
+                    setValue('category', [...currentSelection, cat], { shouldValidate: true });
+                  } else {
+                    setValue('category', currentSelection.filter(c => c !== cat), { shouldValidate: true });
+                  }
+                }}
+              >
+                {CATEGORIES_INFO[cat as LinkCategory]?.name || cat}
+              </DropdownMenuCheckboxItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div>
         <Label htmlFor="linkCount" className="text-sm font-medium">
@@ -274,3 +304,4 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     </form>
   );
 }
+
