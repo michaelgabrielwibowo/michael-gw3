@@ -42,6 +42,7 @@ export async function suggestLinks(input: SuggestLinksInput): Promise<SuggestLin
 
 const prompt = ai.definePrompt({
   name: 'suggestLinksPrompt',
+  model: 'googleai/gemini-1.5-flash-latest', // Explicitly set model
   input: {schema: SuggestLinksInputSchema},
   output: {schema: SuggestLinksOutputSchema},
   prompt: `You are an expert in finding relevant, open-source projects or free online resources (like free e-books, tutorials, documentation, open-source software tools).
@@ -106,16 +107,21 @@ const suggestLinksFlow = ai.defineFlow(
         existingLinks: input.existingLinks && input.existingLinks.length > 0 ? input.existingLinks : undefined,
     };
     try {
-      // Assuming 'prompt' is the result of ai.definePrompt
       const response = await prompt(processedInput);
       
       if (!response || !response.output) { 
-        console.error("AI prompt returned no/malformed output. Response:", response);
+        console.error("AI prompt returned no/malformed output. Response:", JSON.stringify(response, null, 2));
         throw new Error("AI returned no valid output or an error occurred during generation.");
       }
       return response.output;
     } catch (flowError: any) { 
       console.error("Error within suggestLinksFlow execution:", flowError.message || flowError);
+      if (flowError.cause) {
+        console.error("Underlying cause:", flowError.cause);
+      }
+      if (flowError.stack) {
+        console.error("Stack trace:", flowError.stack);
+      }
       if (flowError instanceof Error) {
         throw flowError;
       }
@@ -123,4 +129,3 @@ const suggestLinksFlow = ai.defineFlow(
     }
   }
 );
-

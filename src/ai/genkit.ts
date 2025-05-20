@@ -1,10 +1,10 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 
-// The googleAI plugin will automatically look for the GOOGLE_API_KEY 
-// or GOOGLE_GEMINI_API_KEY environment variable.
-// Ensure your .env file has GOOGLE_API_KEY set.
+// The googleAI plugin will use the GOOGLE_API_KEY from the .env file.
+// Ensure your .env file has GOOGLE_API_KEY set with the value you provided.
+// e.g., GOOGLE_API_KEY=AIzaSyChiAOop8Y7ODLbmrhBuK8omBnUjWEa0ZA
 export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.0-flash',
+  plugins: [googleAI({ apiKey: process.env.GOOGLE_API_KEY })],
+  // No global default model specified here; it will be set per-prompt or use plugin defaults.
 });
