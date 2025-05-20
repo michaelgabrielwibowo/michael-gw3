@@ -13,7 +13,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import { z } from 'zod'; // Corrected import
+import { z } from 'zod';
 import { ALL_CATEGORIES } from '@/data/staticLinks';
 
 const ExistingLinkSchema = z.object({
@@ -105,7 +105,22 @@ const suggestLinksFlow = ai.defineFlow(
         count: input.count || 5, // Default to 5 if not provided
         existingLinks: input.existingLinks && input.existingLinks.length > 0 ? input.existingLinks : undefined,
     };
-    const {output} = await prompt(processedInput);
-    return output!;
+    try {
+      // Assuming 'prompt' is the result of ai.definePrompt
+      const response = await prompt(processedInput);
+      
+      if (!response || !response.output) { 
+        console.error("AI prompt returned no/malformed output. Response:", response);
+        throw new Error("AI returned no valid output or an error occurred during generation.");
+      }
+      return response.output;
+    } catch (flowError: any) { 
+      console.error("Error within suggestLinksFlow execution:", flowError.message || flowError);
+      if (flowError instanceof Error) {
+        throw flowError;
+      }
+      throw new Error(String(flowError.message || 'Unknown error in suggestLinksFlow'));
+    }
   }
 );
+
