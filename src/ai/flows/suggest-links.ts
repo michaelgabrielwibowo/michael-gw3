@@ -3,129 +3,211 @@
 'use server';
 /**
  * @fileOverview This file defines a Genkit flow for suggesting relevant links.
- * It can suggest links based on user-defined keywords, an array of categories, a desired count, and a list of existing links to avoid.
- * If no specific criteria are provided, it suggests random open-source/free links.
+ * It suggests links based on user-defined keywords, an array of categories, a desired count,
+ * and a list of existing links to avoid. If no specific criteria are provided, it suggests random links.
  * All links must be for open-source projects or free online resources.
- *
- * - suggestLinks - A function that takes optional keywords, categories, count, and existing links to suggest relevant new links.
- * - SuggestLinksInput - The input type for the suggestLinks function.
- * - SuggestLinksOutput - The output type for the suggestLinks function.
+ * The AI will attempt to categorize each link into one of the functional categories.
  */
 
-import {ai} from '@/ai/genkit';
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { ALL_CATEGORIES } from '@/data/staticLinks';
+import { ALL_CATEGORIES, CATEGORIES_INFO } from '@/data/staticLinks';
+import type { LinkCategory, ExistingLink } from '@/types';
 
-const ExistingLinkSchema = z.object({
-  title: z.string().optional().describe('The title of an existing link.'),
-  url: z.string().describe('The URL of an existing link (primary identifier).'),
-});
-
-const SuggestLinksInputSchema = z.object({
+// Schema for data sent TO the AI prompt
+const AIPromptInputSchema = z.object({
   keywords: z.string().optional().describe('Optional keywords related to the desired links. If empty, suggest random links.'),
-  category: z.array(z.string()).optional().describe('Optional array of categories of the links (e.g., learning, project repos, tools, videos). If empty or not provided, choose a random category or suggest from any category.'),
-  count: z.number().min(1).max(20).default(5).describe('The number of new, unique links to suggest. Defaults to 5 if not specified.'),
-  existingLinks: z.array(ExistingLinkSchema).optional().describe('An array of existing links (URL is primary key) to avoid suggesting duplicates. The AI should not suggest any link whose URL is in this list.'),
+  // Categories the user selected as preferences for suggestions
+  preferredCategories: z.array(z.string()).optional().describe('Optional array of preferred categories (e.g., Learning, Tools). If empty, suggest from any valid category.'),
+  // Full list of valid categories the AI *must* choose from for each suggested link
+  validCategories: z.array(z.string()).describe('The list of all valid categories the AI must assign to each link.'),
+  count: z.number().min(1).max(50).default(5).describe('The number of new, unique links to suggest. Defaults to 5 if not specified.'),
+  existingLinks: z.array(z.object({
+    title: z.string().optional(),
+    url: z.string().describe('The URL of an existing link (primary identifier).'),
+  })).optional().describe('An array of existing links (URL is primary key) to avoid suggesting duplicates. The AI should not suggest any link whose URL is in this list.'),
 });
-export type SuggestLinksInput = z.infer<typeof SuggestLinksInputSchema>;
+type AIPromptInput = z.infer<typeof AIPromptInputSchema>;
 
-const SuggestLinksOutputSchema = z.object({
+// Schema for data received directly FROM the AI prompt (category is a string here)
+const AIPromptOutputSchema = z.object({
   suggestedLinks: z
-    .array(z.object({title: z.string(), url: z.string(), description: z.string()}))
-    .describe('An array of suggested links with title, URL, and description. All links must be for open-source projects or free online resources (e.g., free e-books, tutorials). The number of links should match the requested count.'),
+    .array(z.object({
+      title: z.string(),
+      url: z.string(),
+      description: z.string(),
+      category: z.string().describe(`The category of the link. Must be one of: ${ALL_CATEGORIES.join(', ')}`),
+    }))
+    .describe('An array of suggested links with title, URL, description, and category. All links must be for open-source projects or free online resources. The number of links should match the requested count.'),
 });
+
+// Final output schema for the flow (category is the strict LinkCategory type)
+const SuggestLinksOutputSchema = z.object({
+    suggestedLinks: z.array(z.object({
+        title: z.string(),
+        url: z.string(),
+        description: z.string(),
+        category: z.enum(ALL_CATEGORIES), // Use Zod enum with ALL_CATEGORIES
+    })),
+});
+export type SuggestLinksInput = z.infer<typeof AIPromptInputSchema>; // Keep input broad
 export type SuggestLinksOutput = z.infer<typeof SuggestLinksOutputSchema>;
+
 
 export async function suggestLinks(input: SuggestLinksInput): Promise<SuggestLinksOutput> {
   return suggestLinksFlow(input);
 }
 
-const prompt = ai.definePrompt({
+const suggestLinksPrompt = ai.definePrompt({
   name: 'suggestLinksPrompt',
-  model: 'googleai/gemini-1.5-flash-latest', // Explicitly set model
-  input: {schema: SuggestLinksInputSchema},
-  output: {schema: SuggestLinksOutputSchema},
+  model: 'googleai/gemini-1.5-flash-latest',
+  input: { schema: AIPromptInputSchema }, // AI prompt uses the flexible input schema
+  output: { schema: AIPromptOutputSchema }, // AI prompt uses flexible output schema (string category)
   prompt: `You are an expert in finding relevant, open-source projects or free online resources (like free e-books, tutorials, documentation, open-source software tools).
-Suggest exactly {{count}} new, unique links. Each link must have a title, URL, and a brief description.
-Ensure all suggested links are genuinely open-source or completely free to access/use. For example, GitHub repositories for open-source projects, free online courses, free e-books, or free software tools.
+Suggest exactly {{count}} new, unique links. Each link must have a title, URL, a brief description, and a category.
+Ensure all suggested links are genuinely open-source or completely free to access/use.
+
+Analyze the content of each link (title, description) and assign it the MOST appropriate category from the following list:
+{{#each validCategories}}
+- "{{this}}"
+{{/each}}
+Default to "Other" if no other category is a strong fit.
 
 {{#if keywords}}
 Base your suggestions on the provided keywords: "{{keywords}}".
 {{/if}}
 
-{{#if category.length}}
-Focus on the following categories:
-{{#each category}}
+{{#if preferredCategories.length}}
+Try to focus on the following preferred categories if relevant to the keywords:
+{{#each preferredCategories}}
 - "{{this}}"
 {{/each}}
 {{else}}
-You can pick a suitable category or suggest from any relevant category. Possible categories include: ${ALL_CATEGORIES.join(', ')}.
+You can suggest from any relevant category from the valid list provided above.
 {{/if}}
 
-{{#if existingLinks}}
+{{#if existingLinks.length}}
 IMPORTANT: Do NOT suggest any of the following links as they are already known. Avoid suggesting any link if its URL is present in this list:
 {{#each existingLinks}}
 - {{#if this.title}}Title: {{this.title}}, {{/if}}URL: {{this.url}}
 {{/each}}
 {{/if}}
 
-Provide the suggested links in the specified JSON format.
+Provide the suggested links in the specified JSON format, ensuring the 'category' for each link is one of the valid categories listed above.
 `,
   config: {
     safetySettings: [
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-      },
-       {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-      {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-      {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
     ],
   }
 });
 
+const MAX_ATTEMPTS_OVERALL = 50; // Overall safeguard against extremely long loops
+const MAX_CONSECUTIVE_NO_NEW_LINKS = 3;
+const MAX_CONSECUTIVE_MALFORMED_RESPONSES = 2;
+const BATCH_SIZE_PER_ATTEMPT_FACTOR = 1.5; // Request slightly more than needed
+
 const suggestLinksFlow = ai.defineFlow(
   {
     name: 'suggestLinksFlow',
-    inputSchema: SuggestLinksInputSchema,
-    outputSchema: SuggestLinksOutputSchema,
+    inputSchema: AIPromptInputSchema, // Flow input remains flexible
+    outputSchema: SuggestLinksOutputSchema, // Flow output uses strict schema
   },
   async (input) => {
-    const processedInput = {
+    const targetCount = input.count || 5;
+    let accumulatedSuggestions: SuggestLinksOutput['suggestedLinks'] = [];
+    let currentKnownLinks = [...(input.existingLinks || [])];
+    let attempts = 0;
+    let consecutiveNoNewUniqueLinks = 0;
+    let consecutiveMalformedResponses = 0;
+
+    while (accumulatedSuggestions.length < targetCount && attempts < MAX_ATTEMPTS_OVERALL) {
+      attempts++;
+      const remainingCount = targetCount - accumulatedSuggestions.length;
+      // Request slightly more to account for potential duplicates, max 20 per call
+      const countToRequestThisAttempt = Math.min(20, Math.max(1, Math.ceil(remainingCount * BATCH_SIZE_PER_ATTEMPT_FACTOR)));
+
+      const processedInput: AIPromptInput = {
         keywords: input.keywords || undefined,
-        category: input.category && input.category.length > 0 ? input.category : undefined,
-        count: input.count || 5, // Default to 5 if not provided
-        existingLinks: input.existingLinks && input.existingLinks.length > 0 ? input.existingLinks : undefined,
-    };
-    try {
-      const response = await prompt(processedInput);
-      
-      if (!response || !response.output) { 
-        console.error("AI prompt returned no/malformed output. Response:", JSON.stringify(response, null, 2));
-        throw new Error("AI returned no valid output or an error occurred during generation.");
+        preferredCategories: input.preferredCategories && input.preferredCategories.length > 0 ? input.preferredCategories : undefined,
+        validCategories: ALL_CATEGORIES, // Pass all valid categories for AI to choose from
+        count: countToRequestThisAttempt,
+        existingLinks: currentKnownLinks.length > 0 ? currentKnownLinks : undefined,
+      };
+
+      console.log(`Attempt ${attempts}: Requesting ${countToRequestThisAttempt} links. Known links: ${currentKnownLinks.length}. Accumulated: ${accumulatedSuggestions.length}`);
+
+      try {
+        const response = await suggestLinksPrompt(processedInput);
+
+        if (!response || !response.output || !response.output.suggestedLinks) {
+          console.error(`AI prompt returned no/malformed output on attempt ${attempts}. Response:`, JSON.stringify(response, null, 2));
+          consecutiveMalformedResponses++;
+          if (consecutiveMalformedResponses >= MAX_CONSECUTIVE_MALFORMED_RESPONSES) {
+            console.warn(`Max consecutive malformed responses reached (${MAX_CONSECUTIVE_MALFORMED_RESPONSES}). Aborting further attempts.`);
+            throw new Error("AI returned malformed output multiple times.");
+          }
+          continue; // Try again
+        }
+        consecutiveMalformedResponses = 0; // Reset counter on successful parse
+
+        const newLinksFromAI = response.output.suggestedLinks;
+        let newUniqueLinksAddedThisAttempt = 0;
+
+        for (const aiLink of newLinksFromAI) {
+          if (accumulatedSuggestions.length >= targetCount) break;
+
+          const isDuplicateInSession = accumulatedSuggestions.some(l => l.url === aiLink.url);
+          const isDuplicateInKnown = currentKnownLinks.some(l => l.url === aiLink.url);
+
+          if (!isDuplicateInSession && !isDuplicateInKnown) {
+            // Normalize category
+            const normalizedCategory = ALL_CATEGORIES.find(cat => cat.toLowerCase() === aiLink.category.toLowerCase()) || 'Other';
+            if (normalizedCategory.toLowerCase() !== aiLink.category.toLowerCase() && aiLink.category.toLowerCase() !== 'other') {
+                 console.warn(`AI suggested category "${aiLink.category}", normalized to "${normalizedCategory}". Link: ${aiLink.title}`);
+            }
+
+            accumulatedSuggestions.push({
+              ...aiLink,
+              category: normalizedCategory as LinkCategory, // Cast to strict type for final output
+            });
+            currentKnownLinks.push({ url: aiLink.url, title: aiLink.title }); // Add to known links for next iteration
+            newUniqueLinksAddedThisAttempt++;
+          }
+        }
+
+        if (newUniqueLinksAddedThisAttempt === 0 && newLinksFromAI.length > 0) {
+          consecutiveNoNewUniqueLinks++;
+        } else {
+          consecutiveNoNewUniqueLinks = 0; // Reset if new unique links were found
+        }
+
+        if (consecutiveNoNewUniqueLinks >= MAX_CONSECUTIVE_NO_NEW_LINKS) {
+          console.warn(`No new unique links found for ${MAX_CONSECUTIVE_NO_NEW_LINKS} consecutive attempts. Stopping.`);
+          break;
+        }
+
+      } catch (flowError: any) {
+        console.error(`Error during suggestLinksPrompt attempt ${attempts}:`, flowError.message || flowError);
+        if (flowError.cause) console.error("Underlying cause:", flowError.cause);
+        // If it's a significant error, break; otherwise, might retry depending on logic
+        consecutiveMalformedResponses++; // Treat as potential malformed for retry logic
+         if (consecutiveMalformedResponses >= MAX_CONSECUTIVE_MALFORMED_RESPONSES) {
+            console.warn(`Max consecutive errors/malformed responses reached (${MAX_CONSECUTIVE_MALFORMED_RESPONSES}). Aborting further attempts.`);
+            throw flowError; // Rethrow if it's a persistent issue
+         }
       }
-      return response.output;
-    } catch (flowError: any) { 
-      console.error("Error within suggestLinksFlow execution:", flowError.message || flowError);
-      if (flowError.cause) {
-        console.error("Underlying cause:", flowError.cause);
-      }
-      if (flowError.stack) {
-        console.error("Stack trace:", flowError.stack);
-      }
-      if (flowError instanceof Error) {
-        throw flowError;
-      }
-      throw new Error(String(flowError.message || 'Unknown error in suggestLinksFlow'));
     }
+
+    if (accumulatedSuggestions.length < targetCount) {
+      console.warn(`Flow finished. Suggested ${accumulatedSuggestions.length} links, but target was ${targetCount}. Attempts: ${attempts}`);
+    } else {
+      console.log(`Flow finished. Successfully suggested ${accumulatedSuggestions.length} links. Attempts: ${attempts}`);
+    }
+
+    return { suggestedLinks: accumulatedSuggestions.slice(0, targetCount) }; // Ensure we don't exceed target
   }
 );

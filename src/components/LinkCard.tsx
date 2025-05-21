@@ -1,18 +1,20 @@
+
 'use client';
 
-import type { LinkItem } from '@/types';
+import type { LinkItem, LinkCategory } from '@/types';
 import { CATEGORIES_INFO } from '@/data/staticLinks';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Lightbulb } from 'lucide-react';
+// Badge and Lightbulb removed as source distinction is gone
+import { ExternalLink, HelpCircle } from 'lucide-react';
 
 interface LinkCardProps {
   link: LinkItem;
 }
 
 export function LinkCard({ link }: LinkCardProps) {
-  const categoryInfo = CATEGORIES_INFO[link.category] || { icon: ExternalLink, color: 'text-gray-500', name: link.category };
+  // Use 'Other' as a fallback if the category is not in CATEGORIES_INFO (though flow should prevent this)
+  const categoryInfo = CATEGORIES_INFO[link.category] || CATEGORIES_INFO['Other'] || { icon: HelpCircle, color: 'text-gray-500', name: 'Other' };
   const IconComponent = categoryInfo.icon;
 
   return (
@@ -20,11 +22,7 @@ export function LinkCard({ link }: LinkCardProps) {
       <CardHeader>
         <div className="flex items-center justify-between mb-2">
           <IconComponent className={`h-6 w-6 ${categoryInfo.color}`} />
-          {link.source === 'ai' && (
-            <Badge variant="outline" className="flex items-center gap-1 border-accent text-accent">
-              <Lightbulb className="h-3 w-3" /> AI
-            </Badge>
-          )}
+          {/* AI Badge removed as 'source' property is gone */}
         </div>
         <CardTitle className="text-lg font-semibold">{link.title}</CardTitle>
       </CardHeader>
