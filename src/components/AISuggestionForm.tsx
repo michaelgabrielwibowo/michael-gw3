@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { LinkCategory, ExistingLink } from '@/types';
+import { useState } from 'react';
+import type { ExistingLink, LinkCategory } from '@/types';
 import { ALL_CATEGORIES, CATEGORIES_INFO } from '@/data/staticLinks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +25,8 @@ import {
 
 const SuggestionFormSchema = z.object({
   keywords: z.string().optional(),
-  category: z.array(z.string()).optional().default([]), // Changed to array of strings
-  linkCount: z.number().min(1).max(20).default(5),
+  category: z.array(z.string()).optional().default([]),
+  linkCount: z.number().min(1).max(50).default(5),
 });
 
 type SuggestionFormValues = z.infer<typeof SuggestionFormSchema>;
@@ -34,14 +34,12 @@ type SuggestionFormValues = z.infer<typeof SuggestionFormSchema>;
 interface AISuggestionFormProps {
   onSuggest: (
     keywords: string, 
-    categories: string[], // Changed from LinkCategory | ''
+    categories: string[],
     linkCount: number, 
     existingLinks: ExistingLink[]
   ) => Promise<void>;
   isLoading: boolean;
 }
-
-// MAX_FILE_SIZE constant removed
 
 export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps) {
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<SuggestionFormValues>({
@@ -119,40 +117,56 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     }
   };
 
-  const parseXlsxContent = (buffer: ArrayBuffer): ExistingLink[] => {
+  const parseXlsxContent = async (buffer: ArrayBuffer): Promise<ExistingLink[]> => {
     try {
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      if (!firstSheetName) {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.worksheets[0]; 
+
+      if (!worksheet) {
         toast({ title: "XLSX Parsing Error", description: "No sheets found in the XLSX file.", variant: "destructive" });
-        return [];
-      }
-      const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
-
-      if (jsonData.length === 0) return [];
-
-      const headers = (jsonData[0] as any[]).map(h => String(h).toLowerCase().trim());
-      const urlIndex = headers.indexOf('url');
-      const titleIndex = headers.indexOf('title');
-
-      if (urlIndex === -1) {
-        toast({ title: "XLSX Parsing Error", description: "XLSX file must contain a 'url' column in the first sheet.", variant: "destructive" });
         return [];
       }
 
       const links: ExistingLink[] = [];
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as any[];
-        const url = row[urlIndex] ? String(row[urlIndex]).trim() : '';
+      let urlColIndex = -1; 
+      let titleColIndex = -1; 
+
+      const firstRow = worksheet.getRow(1);
+      if (firstRow.actualCellCount === 0 && worksheet.actualRowCount === 0) {
+          return [];
+      }
+
+      firstRow.eachCell((cell, colNumber) => {
+        const cellValue = String(cell.value || '').toLowerCase().trim();
+        if (cellValue === 'url') urlColIndex = colNumber;
+        if (cellValue === 'title') titleColIndex = colNumber;
+      });
+
+      if (urlColIndex === -1) {
+        toast({ title: "XLSX Parsing Error", description: "XLSX file must contain a 'url' column in the first sheet.", variant: "destructive" });
+        return [];
+      }
+
+      for (let i = 2; i <= worksheet.rowCount; i++) {
+        const row = worksheet.getRow(i);
+        if (row.actualCellCount === 0) continue; 
+
+        const urlCell = row.getCell(urlColIndex);
+        const url = (urlCell.text || String(urlCell.value || '')).trim();
+
         if (url) {
-          const title = titleIndex !== -1 && row[titleIndex] ? String(row[titleIndex]).trim() : undefined;
+          let title: string | undefined = undefined;
+          if (titleColIndex !== -1) {
+            const titleCell = row.getCell(titleColIndex);
+            title = (titleCell.text || String(titleCell.value || '')).trim() || undefined;
+          }
           links.push({ title, url });
         }
       }
       return links.filter(link => link.url);
     } catch (error) {
-      console.error("Error parsing XLSX file:", error);
+      console.error("Error parsing XLSX file with exceljs:", error);
       toast({ title: "XLSX Parsing Error", description: "Could not parse XLSX file.", variant: "destructive" });
       return [];
     }
@@ -161,7 +175,6 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // File size check removed
       setUploadedFile(file);
       try {
         let links: ExistingLink[] = [];
@@ -173,7 +186,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
           links = parseJsonContent(await file.text());
         } else if (file.name.endsWith('.xlsx')) {
           const arrayBuffer = await file.arrayBuffer();
-          links = parseXlsxContent(arrayBuffer);
+          links = await parseXlsxContent(arrayBuffer); // Await the async parsing
         }
          else {
           toast({ title: "Unsupported File Type", description: "Please upload a .txt, .csv, .json, or .xlsx file.", variant: "destructive" });
@@ -211,7 +224,6 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     }
     return `${selectedCategories.length} categories selected`;
   };
-
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -266,7 +278,7 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
         <Slider
           id="linkCount"
           min={1}
-          max={20}
+          max={50}
           step={1}
           defaultValue={[5]}
           onValueChange={(value) => setValue('linkCount', value[0])}
@@ -294,4 +306,3 @@ export function AISuggestionForm({ onSuggest, isLoading }: AISuggestionFormProps
     </form>
   );
 }
-

@@ -7,7 +7,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { useToast } from "@/hooks/use-toast";
+
 
 interface ExportControlsProps {
   linksToExport: LinkItem[];
@@ -16,11 +18,12 @@ interface ExportControlsProps {
 }
 
 export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestions }: ExportControlsProps) {
+  const { toast } = useToast();
   const getCurrentDateTimeFormatted = () => {
     return format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
   };
 
-  const createBlob = (data: string, type: string) => new Blob([data], { type });
+  const createBlob = (data: string | ArrayBuffer, type: string) => new Blob([data], { type });
 
   const downloadFile = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -127,14 +130,14 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
     downloadFile(blob, `usefuls_${filenameSuffix}_${dateTimeStr}.json`);
   };
 
-  const handleExportXLSX = (combined = false) => {
+  const handleExportXLSX = async (combined = false) => {
     const dateTimeStr = getCurrentDateTimeFormatted();
-    let sheetData;
+    let excelSheetData;
     let filenameSuffix = 'export';
     let sheetName = 'Links';
 
     if (combined && canExportCombined) {
-      const uploadedSheetData = (uploadedLinks ?? []).map(link => ({
+      const uploadedSheetItems = (uploadedLinks ?? []).map(link => ({
         Title: link.title || 'N/A',
         URL: link.url,
         Description: '',
@@ -142,7 +145,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         Source: '',
         Origin: 'Uploaded',
       }));
-      const aiSheetData = (latestAISuggestions ?? []).map(link => ({
+      const aiSheetItems = (latestAISuggestions ?? []).map(link => ({
         Title: link.title,
         URL: link.url,
         Description: link.description,
@@ -150,11 +153,11 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         Source: link.source,
         Origin: 'AI Generated',
       }));
-      sheetData = [...uploadedSheetData, ...aiSheetData];
+      excelSheetData = [...uploadedSheetItems, ...aiSheetItems];
       filenameSuffix = 'combined_export';
       sheetName = 'Combined Links';
     } else {
-      sheetData = linksToExport.map(link => ({
+      excelSheetData = linksToExport.map(link => ({
         ID: link.id,
         Title: link.title,
         URL: link.url,
@@ -165,10 +168,31 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
       }));
     }
     
-    const ws = XLSX.utils.json_to_sheet(sheetData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `usefuls_${filenameSuffix}_${dateTimeStr}.xlsx`);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(sheetName);
+
+    const columns = [
+      { header: 'Title', key: 'Title', width: 30 },
+      { header: 'URL', key: 'URL', width: 50 },
+      { header: 'Description', key: 'Description', width: 50 },
+      { header: 'Category', key: 'Category', width: 20 },
+      { header: 'Source', key: 'Source', width: 15 },
+      { header: 'Origin', key: 'Origin', width: 15 },
+    ];
+    if (!combined) {
+       columns.unshift({ header: 'ID', key: 'ID', width: 30 });
+    }
+    worksheet.columns = columns;
+    worksheet.addRows(excelSheetData);
+
+    try {
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = createBlob(buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      downloadFile(blob, `usefuls_${filenameSuffix}_${dateTimeStr}.xlsx`);
+    } catch (error) {
+        console.error("Error exporting XLSX with exceljs:", error);
+        toast({ title: "XLSX Export Error", description: "Could not generate XLSX file.", variant: "destructive" });
+    }
   };
 
   const handleExportPNG = (combined = false) => {
@@ -194,7 +218,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
         <DropdownMenuItem onClick={() => handleExportTXT()}>Export as TXT</DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleExportCSV()}>Export as CSV</DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleExportJSON()}>Export as JSON</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExportXLSX()}>Export as XLSX</DropdownMenuItem>
+        <DropdownMenuItem onClick={async () => await handleExportXLSX()}>Export as XLSX</DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleExportPNG()}>Export as PNG</DropdownMenuItem>
         
         { canExportCombined ? (
@@ -204,7 +228,7 @@ export function ExportControls({ linksToExport, uploadedLinks, latestAISuggestio
             <DropdownMenuItem onClick={() => handleExportTXT(true)}>Export Combined TXT</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportCSV(true)}>Export Combined CSV</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportJSON(true)}>Export Combined JSON</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportXLSX(true)}>Export Combined XLSX</DropdownMenuItem>
+            <DropdownMenuItem onClick={async () => await handleExportXLSX(true)}>Export Combined XLSX</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportPNG(true)}>Export Combined PNG</DropdownMenuItem>
           </>
         ) : null}
