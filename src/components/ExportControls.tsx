@@ -52,10 +52,10 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
         document.body.removeChild(link);
       } catch (error) {
         console.error(`Error exporting ${elementId} to PNG as ${filename}:`, error);
-        alert(`Failed to export as PNG (${filename}). Check console for details.`);
+        toast({ title: "PNG Export Error", description: `Failed to export as PNG (${filename}). Check console for details.`, variant: "destructive" });
       }
     } else {
-      alert(`Could not find element "${elementId}" to export. Ensure it is visible.`);
+      toast({ title: "PNG Export Error", description: `Could not find element "${elementId}" to export. Ensure it is visible.`, variant: "destructive" });
     }
   };
 
@@ -76,7 +76,7 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
     }
     
     data += linksToExport
-      .map(link => `Title: ${link.title}\nURL: ${link.url}\nDescription: ${link.description}\nCategory: ${link.category}\n---`) // Source/Origin removed
+      .map(link => `ID: ${link.id}\nTitle: ${link.title}\nURL: ${link.url}\nDescription: ${link.description}\nCategory: ${link.category}\n---`)
       .join('\\n\\n');
       
     const blob = createBlob(data, 'text/plain;charset=utf-8');
@@ -85,8 +85,7 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
 
   const handleExportCSV = (forCombinedExport = false) => {
     const dateTimeStr = getCurrentDateTimeFormatted();
-    // Source and Origin columns removed
-    const header = 'Title,URL,Description,Category\\n';
+    const header = 'ID,Title,URL,Description,Category\\n'; // Added ID, removed Timestamp
     let rows = '';
     let filenameSuffix = 'current_view_export';
 
@@ -94,14 +93,14 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
         filenameSuffix = 'combined_export';
         if (uploadedLinks && uploadedLinks.length > 0) {
              rows += uploadedLinks
-            .map(link => `"${(link.title || 'N/A').replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","",""`) // No desc/cat for uploaded
+            .map(link => `"","${(link.title || 'N/A').replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","",""`) // No ID, desc, cat for uploaded
             .join('\\n');
             if (linksToExport.length > 0) rows += '\\n';
         }
     }
 
     rows += linksToExport
-      .map(link => `"${link.title.replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","${link.description.replace(/"/g, '""')}","${link.category}"`)
+      .map(link => `"${link.id}","${link.title.replace(/"/g, '""')}","${link.url.replace(/"/g, '""')}","${link.description.replace(/"/g, '""')}","${link.category}"`)
       .join('\\n');
       
     const data = header + rows;
@@ -114,16 +113,17 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
     let exportData;
     let filenameSuffix = 'current_view_export';
 
-    const cleanLinksForExport = (links: LinkItem[]) => links.map(({ source, ...rest }) => rest); // Remove source if it existed
+    // Function to prepare links for JSON, removing timestamp
+    const cleanLinksForJsonExport = (links: LinkItem[]) => links.map(({ addedTimestamp, ...rest }) => rest);
 
     if (forCombinedExport && canExportCombined) {
       filenameSuffix = 'combined_export';
       exportData = {
-        uploadedLinksFromForm: uploadedLinks || [],
-        currentLinkCollection: cleanLinksForExport(linksToExport),
+        uploadedLinksFromForm: uploadedLinks || [], // These only have title & URL
+        currentLinkCollection: cleanLinksForJsonExport(linksToExport),
       };
     } else {
-      exportData = cleanLinksForExport(linksToExport);
+      exportData = cleanLinksForJsonExport(linksToExport);
     }
     const data = JSON.stringify(exportData, null, 2);
     const blob = createBlob(data, 'application/json;charset=utf-8');
@@ -135,11 +135,29 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
     const workbook = new ExcelJS.Workbook();
     let filenameSuffix = 'current_view_export';
     
+    const collectionSheetColumns = [
+      { header: 'ID', key: 'ID', width: 30 },
+      { header: 'Title', key: 'Title', width: 30 },
+      { header: 'URL', key: 'URL', width: 50 },
+      { header: 'Description', key: 'Description', width: 50 },
+      { header: 'Category', key: 'Category', width: 20 },
+      // Removed 'Added Timestamp' column
+    ];
+
+    const collectionSheetData = linksToExport.map(link => ({
+      ID: link.id,
+      Title: link.title,
+      URL: link.url,
+      Description: link.description,
+      Category: link.category,
+      // Removed addedTimestamp
+    }));
+
     if (forCombinedExport && canExportCombined) {
         filenameSuffix = 'combined_export';
         if (uploadedLinks && uploadedLinks.length > 0) {
             const uploadedSheet = workbook.addWorksheet('Uploaded Links (from form)');
-            uploadedSheet.columns = [
+            uploadedSheet.columns = [ // Only Title and URL for uploaded links
                 { header: 'Title', key: 'Title', width: 30 },
                 { header: 'URL', key: 'URL', width: 50 },
             ];
@@ -148,26 +166,14 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
                 URL: link.url,
             })));
         }
+        const collectionSheet = workbook.addWorksheet('Current Link Collection');
+        collectionSheet.columns = collectionSheetColumns;
+        collectionSheet.addRows(collectionSheetData);
+    } else {
+      const collectionSheet = workbook.addWorksheet('Links');
+      collectionSheet.columns = collectionSheetColumns;
+      collectionSheet.addRows(collectionSheetData);
     }
-
-    const collectionSheet = workbook.addWorksheet(forCombinedExport ? 'Current Link Collection' : 'Links');
-    // Source and Origin columns removed
-    collectionSheet.columns = [
-      { header: 'ID', key: 'ID', width: 30 },
-      { header: 'Title', key: 'Title', width: 30 },
-      { header: 'URL', key: 'URL', width: 50 },
-      { header: 'Description', key: 'Description', width: 50 },
-      { header: 'Category', key: 'Category', width: 20 },
-      { header: 'Added Timestamp', key: 'AddedTimestamp', width: 20}
-    ];
-    collectionSheet.addRows(linksToExport.map(link => ({
-      ID: link.id,
-      Title: link.title,
-      URL: link.url,
-      Description: link.description,
-      Category: link.category,
-      AddedTimestamp: link.addedTimestamp ? new Date(link.addedTimestamp).toISOString() : ''
-    })));
 
     try {
       const buffer = await workbook.xlsx.writeBuffer();
@@ -179,12 +185,11 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
     }
   };
 
-  const handleExportPNG = () => { // PNG export doesn't have combined/current view distinction, it captures the current list
+  const handleExportPNG = () => { 
     const dateTimeStr = getCurrentDateTimeFormatted();
     exportElementAsPNG('link-list-container', `usefuls_link_list_${dateTimeStr}.png`);
   };
 
-  // Combined export is possible if there are uploaded links to combine with the current collection
   const canExportCombined = uploadedLinks && uploadedLinks.length > 0;
 
   return (
@@ -217,3 +222,4 @@ export function ExportControls({ linksToExport, uploadedLinks }: ExportControlsP
     </DropdownMenu>
   );
 }
+
