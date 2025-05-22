@@ -1,9 +1,10 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { z } from 'zod'; // Import Zod for schema-derived types if needed
+import { z } from 'zod';
+import type { ALL_CATEGORIES } from '@/data/staticLinks'; // Import for deriving LinkCategory
 
-// Define categories
-export type LinkCategory = 'Learning' | 'Tools' | 'Project Repos' | 'Videos' | 'Other';
+// Derive LinkCategory from the single source of truth in staticLinks.ts
+export type LinkCategory = typeof ALL_CATEGORIES[number];
 
 export interface LinkItem {
   id: string;
@@ -26,11 +27,11 @@ export interface ExistingLink {
   url: string;
 }
 
-// Types for suggestLinks flow
+// Types for suggestLinks flow (Input type as defined in the flow file)
 export interface SuggestLinksInput {
   keywords?: string;
-  preferredCategories?: string[];
-  validCategories: string[]; // All_CATEGORIES from staticLinks
+  preferredCategories?: string[]; // Array of LinkCategory strings
+  validCategories: readonly string[]; // Should be ALL_CATEGORIES from staticLinks
   count: number;
   existingLinks?: ExistingLink[];
 }
@@ -53,7 +54,7 @@ export interface LinkDataItemForAI {
   title: string;
   description: string;
   url: string;
-  category: string; 
+  category: string;
   addedTimestamp?: number;
 }
 
@@ -63,5 +64,5 @@ export interface FilterLinksByKeywordInput {
 }
 
 export interface FilterLinksByKeywordOutput {
-  relevantLinks: { id: string }[]; // AI returns only IDs of relevant links
+  relevantLinks: { id: string }[];
 }
